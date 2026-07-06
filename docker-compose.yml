@@ -1,0 +1,21 @@
+name: kiroclaim
+
+services:
+  kiroclaim:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kiroclaim:latest
+    container_name: kiroclaim
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9527}:9527"
+    env_file:
+      - .env
+    environment:
+      GIN_MODE: release
+      PORT: 9527
+      DB_PATH: /app/data/app.db
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
