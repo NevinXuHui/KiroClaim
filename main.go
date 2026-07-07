@@ -81,8 +81,16 @@ func main() {
 	r.GET("/setup", func(c *gin.Context) {
 		c.File("./static/setup.html")
 	})
-	r.GET("/redeem", func(c *gin.Context) {
+	// 兑换页面 - 支持多个短路径
+	r.GET("/c", func(c *gin.Context) {
 		c.File("./static/redeem.html")
+	})
+	r.GET("/r", func(c *gin.Context) {
+		c.File("./static/redeem.html")
+	})
+	// 兼容旧地址
+	r.GET("/redeem", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/c")
 	})
 
 	r.GET("/admin/setup/status", handler.AdminSetupStatus)
