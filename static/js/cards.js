@@ -42,8 +42,16 @@ async function copyCardKeys() {
     const prefix = (settingsResp.code === 0 && settingsResp.data?.cardKeyPrefix) 
       ? settingsResp.data.cardKeyPrefix 
       : '';
+    const suffix = (settingsResp.code === 0 && settingsResp.data?.cardKeySuffix) 
+      ? settingsResp.data.cardKeySuffix 
+      : '';
     
-    const textToCopy = codes.map(code => prefix + code).join('\n');
+    const textToCopy = codes.map(code => {
+      let line = code;
+      if (prefix) line = prefix + ' ' + line;
+      if (suffix) line = line + ' ' + suffix;
+      return line;
+    }).join('\n');
     
     navigator.clipboard.writeText(textToCopy).then(function() {
       showToast('已复制到剪贴板', 'success');

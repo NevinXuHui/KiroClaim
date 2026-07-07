@@ -414,7 +414,12 @@
                 <div class="settings-field">
                   <label class="settings-label" for="settingCardKeyPrefix">卡密复制前缀</label>
                   <input class="k-input" type="text" id="settingCardKeyPrefix" autocomplete="off" spellcheck="false" placeholder="例如：https://example.com/redeem?key=">
-                  <div class="settings-help">复制卡密时在每行前添加的文字，留空则不添加前缀</div>
+                  <div class="settings-help">复制卡密时在每行前添加的文字，前缀和卡密之间会自动加空格</div>
+                </div>
+                <div class="settings-field">
+                  <label class="settings-label" for="settingCardKeySuffix">卡密复制后缀</label>
+                  <input class="k-input" type="text" id="settingCardKeySuffix" autocomplete="off" spellcheck="false" placeholder="例如：&utm_source=admin">
+                  <div class="settings-help">复制卡密时在每行后添加的文字，卡密和后缀之间会自动加空格</div>
                 </div>
               </div>
               <div class="settings-column">
