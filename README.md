@@ -43,6 +43,7 @@ mkdir -p kiroclaim && cd kiroclaim && curl -fsSL https://raw.githubusercontent.c
 
 启动后访问：
 
+- 管理后台：`http://服务器IP:9527/admin`
 - 初始化页面：`http://服务器IP:9527/setup`
 - 兑换中心：`http://服务器IP:9527/c` 或 `/r`（旧地址 `/redeem` 自动重定向）
 

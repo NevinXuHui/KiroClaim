@@ -75,7 +75,8 @@ func main() {
 
 	r.Static("/static", "./static")
 	r.StaticFile("/favicon.ico", "./static/favicon.ico")
-	r.GET("/", func(c *gin.Context) {
+	// 管理后台登录页
+	r.GET("/admin", func(c *gin.Context) {
 		c.File("./static/index.html")
 	})
 	r.GET("/setup", func(c *gin.Context) {
