@@ -28,6 +28,25 @@ function cardStatusBadge(status) {
   return map[status] || map.unused;
 }
 
+// 格式化时间显示（支持 ISO 8601 字符串和时间戳）
+function formatCardTime(value) {
+  if (!value) return '-';
+  try {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleString('zh-CN', {
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return '-';
+  }
+}
+
 async function copyCardKeys() {
   const textarea = document.getElementById('generatedCodes');
   if (!textarea) return;
@@ -94,6 +113,7 @@ async function loadCards(page = 1) {
     const subscription = cardSubscriptionLabel(c.Subscription || '');
     const status = c.Status || (c.UsedAt ? 'active' : 'unused');
     const emailDomainLabel = c.AllowedEmailDomains ? `<span class="k-badge" style="background:#fef3c7;color:#92400e;font-size:11px" title="限制邮箱域名: ${escapeAttr(c.AllowedEmailDomains)}">🔒${escapeHtml(c.AllowedEmailDomains.split(',')[0])}${c.AllowedEmailDomains.split(',').length > 1 ? '...' : ''}</span>` : '';
+    const usedAtDisplay = formatCardTime(c.UsedAt);
     return `<tr>
       <td data-label="选择"><input type="checkbox" class="k-checkbox" ${checked} onchange="toggleCardSelect(${c.ID}, this.checked)"></td>
       <td data-label="ID">${c.ID}</td>
@@ -104,6 +124,7 @@ async function loadCards(page = 1) {
       </td>
       <td data-label="账号订阅" style="font-size:12px;white-space:nowrap">${escapeHtml(subscription)} ${multiLabel} ${emailDomainLabel}</td>
       <td data-label="状态">${cardStatusBadge(status)}</td>
+      <td data-label="兑换时间" style="font-size:12px;color:var(--text-muted)">${usedAtDisplay}</td>
       <td data-label="操作">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="showCardLogs(${c.ID}, '${escapeAttr(c.Code)}')">详情</button>
