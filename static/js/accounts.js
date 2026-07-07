@@ -25,6 +25,14 @@ async function loadAccounts(page = 1) {
 
   const r = await api('GET', url);
   const tbody = document.getElementById('accountsBody');
+  
+  // 更新筛选数量显示
+  const countEl = document.getElementById('accountFilterCount');
+  if (countEl && r.code === 0) {
+    const total = r.data.total || 0;
+    countEl.textContent = total > 0 ? `(共 ${total} 个账号)` : '';
+  }
+  
   if (r.code !== 0 || !r.data.list.length) {
     const emptyMsg = accountUsedFilter === 'false' ? '暂无未兑换账号' : 
                      accountUsedFilter === 'true' ? '暂无已兑换账号' : '暂无账号';
@@ -77,6 +85,7 @@ async function loadAccounts(page = 1) {
         <div class="account-actions">
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="showAccountDetail(${a.ID})">详细</button>
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccount(${a.ID}, 'accounts', this)">刷新</button>
+          <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="exportSingleAccount(${a.ID})">导出</button>
           <button class="ui-btn ui-btn-danger ui-btn-sm" onclick="deleteAccount(${a.ID})">删除</button>
         </div>
       </td>
@@ -988,6 +997,7 @@ async function loadAssignedAccounts(page = 1) {
         <div class="account-actions">
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="showAccountDetail(${a.ID})">详细</button>
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccount(${a.ID}, 'assigned', this)">刷新</button>
+          <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="exportSingleAccount(${a.ID})">导出</button>
           <button class="ui-btn ui-btn-danger ui-btn-sm" onclick="deleteAccount(${a.ID}, 'assigned')">删除</button>
         </div>
       </td>

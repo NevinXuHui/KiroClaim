@@ -53,19 +53,95 @@ async function fetchAllPages(baseUrl, pageSize) {
   return all;
 }
 
-// 导出账号，支持 csv / xlsx 格式（仅导出账号池里的未分配账号）
-async function exportAccounts(format) {
-  var url = '/admin/accounts?used=false';
-  if (accountStatusFilter) url += '&status=' + accountStatusFilter;
-  if (accountKeyword) url += '&keyword=' + encodeURIComponent(accountKeyword);
+// 导出单个账号（JSON 完整格式）
+async function exportSingleAccount(accountId) {
+  const btn = event?.target;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '导出中...';
+  }
+  
+  try {
+    var r = await api('GET', '/admin/accounts/' + accountId + '/detail');
+    if (r.code !== 0 || !r.data) {
+      showToast('获取账号信息失败', 'error');
+      return;
+    }
+    
+    var account = {
+      clientId: r.data.clientId || '',
+      clientSecret: r.data.clientSecret || '',
+      creditLimit: r.data.creditLimit || 0,
+      creditUsed: r.data.creditUsed || 0,
+      email: r.data.email || '',
+      provider: r.data.provider || 'idc',
+      refreshToken: r.data.refreshToken || '',
+      region: r.data.region || 'us-east-1',
+      subscription: r.data.subscription?.title || '',
+      time: formatExportTime(r.data.fetchedAt || new Date().toISOString())
+    };
+    
+    var jsonStr = JSON.stringify([account], null, 2);
+    var dateStr = new Date().toISOString().slice(0, 10);
+    var filename = 'account_' + (r.data.email || accountId).replace(/[^a-zA-Z0-9]/g, '_') + '_' + dateStr + '.json';
+    
+    downloadFile(jsonStr, filename, 'application/json;charset=utf-8');
+    showToast('导出成功', 'success');
+  } catch (e) {
+    showToast('导出失败：' + e.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '导出';
+    }
+  }
+}
 
-  var list = await fetchAllPages(url, 500);
+// 导出账号，支持 csv / xlsx 格式（仅导出选中的账号）
+async function exportAccounts(format) {
+  // 检查是否有选中的账号
+  if (!selectedAccountIds || selectedAccountIds.size === 0) {
+    showToast('请先选择要导出的账号', 'warning');
+    return;
+  }
+
+  // 获取选中账号的详细信息
+  var selectedIds = Array.from(selectedAccountIds);
+  var list = [];
+  
+  showToast('正在获取账号信息...', 'info');
+  
+  for (var i = 0; i < selectedIds.length; i++) {
+    try {
+      var r = await api('GET', '/admin/accounts/' + selectedIds[i] + '/detail');
+      if (r.code === 0 && r.data) {
+        list.push({
+          ID: selectedIds[i],
+          Email: r.data.email || '',
+          Status: r.data.status || '',
+          Subscription: r.data.subscription?.title || '',
+          CreditUsed: r.data.creditUsed || 0,
+          CreditLimit: r.data.creditLimit || 0,
+          ClientId: r.data.clientId || '',
+          ClientSecret: r.data.clientSecret || '',
+          RefreshToken: r.data.refreshToken || '',
+          Provider: r.data.provider || 'idc',
+          Region: r.data.region || 'us-east-1',
+          CreatedAt: r.data.fetchedAt || new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      console.error('获取账号详情失败:', e);
+    }
+  }
+
   if (!list.length) {
     showToast('没有可导出的数据', 'info');
     return;
   }
+  
   var dateStr = new Date().toISOString().slice(0, 10);
-  var headers = ['ID', '邮箱', '健康状态', '订阅', '已用额度', '总额度', '使用状态', '最后检查'];
+  var headers = ['ID', '邮箱', '健康状态', '订阅', '已用额度', '总额度'];
 
   // 构建行数据
   var rows = list.map(function(a) {
@@ -75,9 +151,7 @@ async function exportAccounts(format) {
       a.Status || '',
       a.Subscription || '',
       a.CreditUsed || 0,
-      a.CreditLimit || 0,
-      a.Used ? '已分配' : '可用',
-      a.LastCheckedAt ? new Date(a.LastCheckedAt).toLocaleString('zh-CN', {hour12: false}) : ''
+      a.CreditLimit || 0
     ];
   });
 
@@ -106,9 +180,7 @@ async function exportAccounts(format) {
       { wch: 10 },  // 健康状态
       { wch: 10 },  // 订阅
       { wch: 10 },  // 已用额度
-      { wch: 10 },  // 总额度
-      { wch: 10 },  // 使用状态
-      { wch: 20 }   // 最后检查
+      { wch: 10 }   // 总额度
     ];
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
