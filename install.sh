@@ -72,15 +72,23 @@ KiroClaim 系统安装脚本
 用法: sudo $0 [选项]
 
 选项:
-    install     安装 KiroClaim 服务
+    install     安装 KiroClaim 服务（交互式）
+    install -y  静默安装 KiroClaim 服务（使用默认配置）
     uninstall   卸载 KiroClaim 服务
     status      查看服务状态
     help        显示此帮助信息
 
 示例:
-    sudo $0 install      # 安装并启动服务
+    sudo $0 install      # 交互式安装
+    sudo $0 install -y   # 静默安装（默认配置）
     sudo $0 uninstall    # 卸载服务
     sudo $0 status       # 查看服务状态
+
+默认配置:
+    安装目录: /opt/kiroclaim
+    运行用户: kiroclaim
+    监听端口: 9527
+    数据库类型: SQLite
 
 EOF
 }
@@ -89,37 +97,47 @@ EOF
 get_install_config() {
     print_step "配置安装参数..."
     
-    # 安装目录
-    read -p "安装目录 (默认: /opt/kiroclaim): " INSTALL_DIR
-    INSTALL_DIR=${INSTALL_DIR:-/opt/kiroclaim}
-    
-    # 运行用户
-    read -p "运行用户 (默认: kiroclaim): " RUN_USER
-    RUN_USER=${RUN_USER:-kiroclaim}
-    
-    # 端口
-    read -p "监听端口 (默认: 9527): " PORT
-    PORT=${PORT:-9527}
-    
-    # 数据库类型
-    echo ""
-    echo "数据库类型:"
-    echo "  1) SQLite (推荐，适合小规模部署)"
-    echo "  2) MySQL (适合生产环境)"
-    read -p "选择 [1-2] (默认: 1): " DB_CHOICE
-    DB_CHOICE=${DB_CHOICE:-1}
-    
-    if [ "$DB_CHOICE" = "2" ]; then
-        DB_TYPE="mysql"
-        read -p "MySQL 地址 (如 localhost:3306): " MYSQL_HOST
-        read -p "MySQL 数据库名: " MYSQL_DB
-        read -p "MySQL 用户名: " MYSQL_USER
-        read -s -p "MySQL 密码: " MYSQL_PASS
-        echo ""
-        DB_DSN="${MYSQL_USER}:${MYSQL_PASS}@tcp(${MYSQL_HOST})/${MYSQL_DB}?charset=utf8mb4&parseTime=True&loc=Local"
-    else
+    # 检查是否为静默安装模式
+    if [ "$SILENT_INSTALL" = "true" ]; then
+        print_info "使用默认配置进行静默安装"
+        INSTALL_DIR="/opt/kiroclaim"
+        RUN_USER="kiroclaim"
+        PORT="9527"
         DB_TYPE="sqlite"
         DB_PATH="${INSTALL_DIR}/data/app.db"
+    else
+        # 安装目录
+        read -p "安装目录 (默认: /opt/kiroclaim): " INSTALL_DIR
+        INSTALL_DIR=${INSTALL_DIR:-/opt/kiroclaim}
+        
+        # 运行用户
+        read -p "运行用户 (默认: kiroclaim): " RUN_USER
+        RUN_USER=${RUN_USER:-kiroclaim}
+        
+        # 端口
+        read -p "监听端口 (默认: 9527): " PORT
+        PORT=${PORT:-9527}
+        
+        # 数据库类型
+        echo ""
+        echo "数据库类型:"
+        echo "  1) SQLite (推荐，适合小规模部署)"
+        echo "  2) MySQL (适合生产环境)"
+        read -p "选择 [1-2] (默认: 1): " DB_CHOICE
+        DB_CHOICE=${DB_CHOICE:-1}
+        
+        if [ "$DB_CHOICE" = "2" ]; then
+            DB_TYPE="mysql"
+            read -p "MySQL 地址 (如 localhost:3306): " MYSQL_HOST
+            read -p "MySQL 数据库名: " MYSQL_DB
+            read -p "MySQL 用户名: " MYSQL_USER
+            read -s -p "MySQL 密码: " MYSQL_PASS
+            echo ""
+            DB_DSN="${MYSQL_USER}:${MYSQL_PASS}@tcp(${MYSQL_HOST})/${MYSQL_DB}?charset=utf8mb4&parseTime=True&loc=Local"
+        else
+            DB_TYPE="sqlite"
+            DB_PATH="${INSTALL_DIR}/data/app.db"
+        fi
     fi
     
     echo ""
@@ -129,11 +147,16 @@ get_install_config() {
     print_info "  监听端口: $PORT"
     print_info "  数据库类型: $DB_TYPE"
     echo ""
-    read -p "确认安装？[y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_warn "安装已取消"
-        exit 0
+    
+    if [ "$SILENT_INSTALL" != "true" ]; then
+        read -p "确认安装？[y/N] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_warn "安装已取消"
+            exit 0
+        fi
+    else
+        print_info "自动确认安装（静默模式）"
     fi
 }
 
@@ -442,6 +465,13 @@ show_status() {
 }
 
 # 主逻辑
+SILENT_INSTALL=false
+
+# 检查是否有 -y 参数
+if [ "$2" = "-y" ] || [ "$2" = "--yes" ]; then
+    SILENT_INSTALL=true
+fi
+
 case "${1:-help}" in
     install)
         do_install

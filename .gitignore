@@ -32,3 +32,6 @@ Thumbs.db
 .idea/
 .vscode/
 kiroclaim-dev
+
+# Temporary upstream clone
+KiroClaim/
