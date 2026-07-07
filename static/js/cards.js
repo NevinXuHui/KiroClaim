@@ -132,6 +132,7 @@ async function loadCards(page = 1) {
       <td data-label="操作">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="showCardLogs(${c.ID}, '${escapeAttr(c.Code)}')">详情</button>
+          ${status === 'active' || c.UsedAt ? `<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="exportCard(${c.ID})">导出</button>` : ''}
           <button class="ui-btn ui-btn-danger ui-btn-sm" onclick="deleteCard(${c.ID})">删除</button>
         </div>
       </td>
@@ -596,4 +597,98 @@ async function refreshAccountInCardLog(accountId, btn) {
       btn.disabled = false;
     }, 2000);
   }
+}
+
+// 导出单个已兑换卡密（JSON 格式，包含关联账号信息）
+async function exportCard(cardId) {
+  const btn = event?.target;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '导出中...';
+  }
+  
+  try {
+    // 获取卡密使用日志
+    const logsResp = await api('GET', '/admin/cards/' + cardId + '/logs');
+    if (logsResp.code !== 0 || !logsResp.data) {
+      showToast('获取卡密信息失败', 'error');
+      return;
+    }
+    
+    const logs = logsResp.data || [];
+    if (logs.length === 0) {
+      showToast('该卡密暂无使用记录', 'warning');
+      return;
+    }
+    
+    // 提取关联的账号ID列表
+    const accountIds = [...new Set(logs.filter(log => log.AccountID > 0).map(log => log.AccountID))];
+    
+    if (accountIds.length === 0) {
+      showToast('该卡密暂无关联账号', 'warning');
+      return;
+    }
+    
+    // 获取每个账号的详细信息
+    const accounts = [];
+    for (const accountId of accountIds) {
+      const r = await api('GET', '/admin/accounts/' + accountId + '/detail');
+      if (r.code === 0 && r.data) {
+        accounts.push({
+          clientId: r.data.clientId || '',
+          clientSecret: r.data.clientSecret || '',
+          creditLimit: r.data.creditLimit || 0,
+          creditUsed: r.data.creditUsed || 0,
+          email: r.data.email || '',
+          provider: r.data.provider || 'idc',
+          refreshToken: r.data.refreshToken || '',
+          region: r.data.region || 'us-east-1',
+          subscription: r.data.subscription?.title || '',
+          time: formatExportTime(r.data.fetchedAt || new Date().toISOString())
+        });
+      }
+    }
+    
+    if (accounts.length === 0) {
+      showToast('无法获取账号详细信息', 'error');
+      return;
+    }
+    
+    // 导出为 JSON 格式
+    const jsonStr = JSON.stringify(accounts, null, 2);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const cardCode = logs[0]?.Code || cardId;
+    const filename = 'card_' + cardCode.replace(/[^a-zA-Z0-9]/g, '_') + '_' + dateStr + '.json';
+    
+    downloadFile(jsonStr, filename, 'application/json;charset=utf-8');
+    showToast('导出成功，共 ' + accounts.length + ' 个账号', 'success');
+  } catch (e) {
+    showToast('导出失败：' + e.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '导出';
+    }
+  }
+}
+
+// 格式化导出时间（从 export.js 引用）
+function formatExportTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+// 下载文件（从 export.js 引用）
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
