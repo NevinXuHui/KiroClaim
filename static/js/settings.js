@@ -25,6 +25,7 @@ async function loadSettings() {
   document.getElementById('settingLogMaxAgeDays').value = Number.isFinite(Number(d.logMaxAgeDays)) ? Number(d.logMaxAgeDays) : 30;
   document.getElementById('settingLogCompress').checked = !!d.logCompress;
   document.getElementById('settingAutoUpdateEnabled').checked = !!d.autoUpdateEnabled;
+  document.getElementById('settingCardKeyPrefix').value = d.cardKeyPrefix || '';
   var state = document.getElementById('settingCaptchaSecretState');
   if (state) state.textContent = d.captchaSecretConfigured ? 'Secret Key 已配置，留空保存不会覆盖。' : 'Secret Key 尚未配置。';
 }
@@ -53,7 +54,8 @@ async function saveSettings() {
     logMaxBackups: readIntSetting('settingLogMaxBackups', 7),
     logMaxAgeDays: readIntSetting('settingLogMaxAgeDays', 30),
     logCompress: document.getElementById('settingLogCompress').checked,
-    autoUpdateEnabled: document.getElementById('settingAutoUpdateEnabled').checked
+    autoUpdateEnabled: document.getElementById('settingAutoUpdateEnabled').checked,
+    cardKeyPrefix: document.getElementById('settingCardKeyPrefix').value.trim()
   };
   var result = document.getElementById('settingsResult');
   if (result) result.innerHTML = '<div style="color:var(--text-muted);font-size:13px">正在保存...</div>';

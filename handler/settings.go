@@ -37,6 +37,7 @@ type AppSettings struct {
 	LogMaxAgeDays               int
 	LogCompress                 bool
 	AutoUpdateEnabled           bool
+	CardKeyPrefix               string
 }
 
 type storedRuntimeSettings struct {
@@ -59,6 +60,7 @@ type storedRuntimeSettings struct {
 	LogMaxAgeDays               *int    `json:"logMaxAgeDays,omitempty"`
 	LogCompress                 *bool   `json:"logCompress,omitempty"`
 	AutoUpdateEnabled           *bool   `json:"autoUpdateEnabled,omitempty"`
+	CardKeyPrefix               *string `json:"cardKeyPrefix,omitempty"`
 }
 
 var (
@@ -88,6 +90,7 @@ func LoadSettingsFromEnv() {
 		LogMaxAgeDays:               logging.MaxAgeDays,
 		LogCompress:                 logging.Compress,
 		AutoUpdateEnabled:           envBool("AUTO_UPDATE_ENABLED", false),
+		CardKeyPrefix:               os.Getenv("CARD_KEY_PREFIX"),
 	}
 	applyStoredRuntimeSettings(&s)
 	normalizeSettings(&s)
@@ -173,6 +176,9 @@ func mergeStoredRuntimeSettings(s *AppSettings, stored storedRuntimeSettings) {
 	if stored.AutoUpdateEnabled != nil {
 		s.AutoUpdateEnabled = *stored.AutoUpdateEnabled
 	}
+	if stored.CardKeyPrefix != nil {
+		s.CardKeyPrefix = *stored.CardKeyPrefix
+	}
 }
 
 func normalizeSettings(s *AppSettings) {
@@ -237,6 +243,7 @@ func persistRuntimeSettings(s AppSettings) error {
 		LogMaxAgeDays:               intPtr(s.LogMaxAgeDays),
 		LogCompress:                 boolPtr(s.LogCompress),
 		AutoUpdateEnabled:           boolPtr(s.AutoUpdateEnabled),
+		CardKeyPrefix:               stringPtr(s.CardKeyPrefix),
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -323,6 +330,7 @@ func AdminSettings(c *gin.Context) {
 			"logMaxAgeDays":               s.LogMaxAgeDays,
 			"logCompress":                 s.LogCompress,
 			"autoUpdateEnabled":           s.AutoUpdateEnabled,
+			"cardKeyPrefix":               s.CardKeyPrefix,
 		},
 	})
 }
@@ -347,6 +355,7 @@ func UpdateAdminSettings(c *gin.Context) {
 		LogMaxAgeDays               int    `json:"logMaxAgeDays"`
 		LogCompress                 bool   `json:"logCompress"`
 		AutoUpdateEnabled           bool   `json:"autoUpdateEnabled"`
+		CardKeyPrefix               string `json:"cardKeyPrefix"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "请求格式错误"})
@@ -417,6 +426,7 @@ func UpdateAdminSettings(c *gin.Context) {
 	s.LogMaxAgeDays = req.LogMaxAgeDays
 	s.LogCompress = req.LogCompress
 	s.AutoUpdateEnabled = req.AutoUpdateEnabled
+	s.CardKeyPrefix = strings.TrimSpace(req.CardKeyPrefix)
 	normalizeSettings(&s)
 
 	if s.CaptchaEnabled {

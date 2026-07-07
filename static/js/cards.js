@@ -27,6 +27,39 @@ function cardStatusBadge(status) {
   return map[status] || map.unused;
 }
 
+async function copyCardKeys() {
+  const textarea = document.getElementById('generatedCodes');
+  if (!textarea) return;
+  
+  const codes = textarea.value.split('\n').filter(line => line.trim() !== '');
+  if (codes.length === 0) {
+    showToast('没有卡密可复制', 'error');
+    return;
+  }
+
+  try {
+    const settingsResp = await api('GET', '/admin/settings');
+    const prefix = (settingsResp.code === 0 && settingsResp.data?.cardKeyPrefix) 
+      ? settingsResp.data.cardKeyPrefix 
+      : '';
+    
+    const textToCopy = codes.map(code => prefix + code).join('\n');
+    
+    navigator.clipboard.writeText(textToCopy).then(function() {
+      showToast('已复制到剪贴板', 'success');
+    }).catch(function() {
+      showToast('复制失败', 'error');
+    });
+  } catch (err) {
+    const textToCopy = codes.join('\n');
+    navigator.clipboard.writeText(textToCopy).then(function() {
+      showToast('已复制到剪贴板', 'success');
+    }).catch(function() {
+      showToast('复制失败', 'error');
+    });
+  }
+}
+
 async function loadCards(page = 1) {
   cardKeyword = (document.getElementById('cardKeyword')?.value || '').trim();
   const createdFrom = document.getElementById('cardCreatedFrom')?.value || '';
@@ -203,7 +236,7 @@ async function doGenerate() {
     const codes = (r.data?.codes || []).join('\n');
     resultEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:13px;color:var(--text-muted)">生成成功，共 ${r.data?.codes?.length ?? count} 张：</span>
-        <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="copyToClipboard(document.getElementById('generatedCodes').value)">一键复制全部</button>
+        <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="copyCardKeys()">一键复制全部</button>
       </div>
       <textarea class="k-input" id="generatedCodes" rows="8" readonly style="font-family:monospace;font-size:12px">${escapeHtml(codes)}</textarea>`;
     loadCards(1);
