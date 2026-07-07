@@ -497,6 +497,21 @@ async function showCardLogs(cardId, code) {
   if (!logs.length) {
     content += '<div style="text-align:center;color:#999;padding:40px;font-size:13px">暂无使用记录</div>';
   } else {
+    // 提取所有可刷新的账号ID（去重，排除封禁账号）
+    var refreshableAccountIds = [...new Set(
+      logs.filter(log => log.AccountID > 0 && log.AccountStatus !== 'suspended')
+        .map(log => log.AccountID)
+    )];
+    
+    // 如果有可刷新的账号，显示全部刷新按钮
+    if (refreshableAccountIds.length > 0) {
+      content += '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
+      content += '<span style="color:var(--text-muted);font-size:13px">共 ' + logs.length + ' 条记录，' + refreshableAccountIds.length + ' 个可刷新账号</span>';
+      content += '<button class="ui-btn ui-btn-primary ui-btn-sm" id="batchRefreshCardAccounts" ' +
+        'onclick="batchRefreshCardAccounts(' + cardId + ', \'' + escapeAttr(code) + '\')">全部刷新</button>';
+      content += '</div>';
+    }
+    
     content += '<table class="card-log-table"><thead><tr><th>操作</th><th>账号邮箱</th><th>健康状态</th><th>额度用量</th><th>客户端 IP</th><th>时间</th><th>操作</th></tr></thead><tbody>';
     logs.forEach(function(log) {
       var actionLabel = log.Action === 'activate' ? '激活' : log.Action;
@@ -697,4 +712,73 @@ function downloadFile(content, filename, mimeType) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// 批量刷新卡密关联的所有账号
+async function batchRefreshCardAccounts(cardId, code) {
+  const btn = document.getElementById('batchRefreshCardAccounts');
+  if (!btn) return;
+  
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '刷新中...';
+  
+  try {
+    // 获取卡密使用日志
+    const logsResp = await api('GET', '/admin/cards/' + cardId + '/logs');
+    if (logsResp.code !== 0 || !logsResp.data) {
+      showToast('获取卡密信息失败', 'error');
+      return;
+    }
+    
+    const logs = logsResp.data || [];
+    // 提取所有可刷新的账号ID（去重，排除封禁账号）
+    const accountIds = [...new Set(
+      logs.filter(log => log.AccountID > 0 && log.AccountStatus !== 'suspended')
+        .map(log => log.AccountID)
+    )];
+    
+    if (accountIds.length === 0) {
+      showToast('没有可刷新的账号', 'warning');
+      return;
+    }
+    
+    btn.textContent = '刷新中 0/' + accountIds.length;
+    
+    // 并发刷新所有账号
+    let successCount = 0;
+    let failCount = 0;
+    const refreshRequests = accountIds.map((accountId, index) => 
+      api('POST', '/admin/accounts/' + accountId + '/refresh')
+        .then(r => {
+          if (r.code === 0) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+          // 更新进度
+          const completed = successCount + failCount;
+          if (btn) {
+            btn.textContent = '刷新中 ' + completed + '/' + accountIds.length;
+          }
+          return r;
+        })
+    );
+    
+    await Promise.all(refreshRequests);
+    
+    // 显示结果
+    const message = `刷新完成：成功 ${successCount}，失败 ${failCount}`;
+    showToast(message, failCount === 0 ? 'success' : 'warning');
+    
+    // 1秒后重新加载卡密详情
+    setTimeout(() => {
+      showCardLogs(cardId, code);
+    }, 1000);
+    
+  } catch (e) {
+    showToast('批量刷新失败：' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
