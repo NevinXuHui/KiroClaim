@@ -40,7 +40,7 @@ func Activate(c *gin.Context) {
 
 	now := time.Now()
 	if card.AccountCount > 1 {
-		accounts, err := popMultipleAccounts(card.AccountCount, card.Subscription)
+		accounts, err := popMultipleAccounts(card.AccountCount, card.Subscription, card.AllowedEmailDomains)
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"code": 2, "message": "账号不足，请联系管理员补充"})
 			return
@@ -76,7 +76,7 @@ func Activate(c *gin.Context) {
 		return
 	}
 
-	account, err := popAccount(0, card.Subscription)
+	account, err := popAccount(0, card.Subscription, card.AllowedEmailDomains)
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"code": 2, "message": "剩余账号不足，请联系管理员补充"})
 		return
@@ -152,7 +152,7 @@ func subscriptionMatches(actual string, required string) bool {
 	return strings.TrimSpace(actual) == required
 }
 
-func isDispatchable(acc *model.Account, subscription string) bool {
+func isDispatchable(acc *model.Account, subscription string, allowedEmailDomains string) bool {
 	if acc == nil {
 		return false
 	}
@@ -165,7 +165,14 @@ func isDispatchable(acc *model.Account, subscription string) bool {
 	if acc.AccessToken == "" {
 		return false
 	}
-	return subscriptionMatches(acc.Subscription, subscription)
+	if !subscriptionMatches(acc.Subscription, subscription) {
+		return false
+	}
+	// 检查邮箱域名限制
+	if !emailMatchesDomains(acc.Email, allowedEmailDomains) {
+		return false
+	}
+	return true
 }
 
 func filterAccountSubscriptionQuery(q *gorm.DB, subscription string) *gorm.DB {
@@ -176,7 +183,35 @@ func filterAccountSubscriptionQuery(q *gorm.DB, subscription string) *gorm.DB {
 	return q.Where("subscription = ?", subscription)
 }
 
-func popAccount(excludeID uint, subscription string) (*model.Account, error) {
+func filterAccountEmailDomainsQuery(q *gorm.DB, allowedEmailDomains string) *gorm.DB {
+	if allowedEmailDomains == "" {
+		return q
+	}
+	domains := strings.Split(allowedEmailDomains, ",")
+	if len(domains) == 0 {
+		return q
+	}
+	
+	// 构建 SQL 条件：email LIKE '%@domain1' OR email LIKE '%@domain2' OR ...
+	orConditions := make([]string, 0, len(domains))
+	args := make([]interface{}, 0, len(domains))
+	for _, domain := range domains {
+		domain = strings.TrimSpace(domain)
+		if domain == "" {
+			continue
+		}
+		orConditions = append(orConditions, "LOWER(email) LIKE ?")
+		args = append(args, "%@"+strings.ToLower(domain))
+	}
+	
+	if len(orConditions) == 0 {
+		return q
+	}
+	
+	return q.Where(strings.Join(orConditions, " OR "), args...)
+}
+
+func popAccount(excludeID uint, subscription string, allowedEmailDomains string) (*model.Account, error) {
 	timer := prometheus.NewTimer(utils.DispatchDuration)
 	defer timer.ObserveDuration()
 
@@ -187,6 +222,7 @@ func popAccount(excludeID uint, subscription string) (*model.Account, error) {
 		q = q.Where("id != ?", excludeID)
 	}
 	q = filterAccountSubscriptionQuery(q, subscription)
+	q = filterAccountEmailDomainsQuery(q, allowedEmailDomains)
 
 	var candidates []model.Account
 	if err := q.Order("created_at ASC, id ASC").Limit(50).Find(&candidates).Error; err != nil {
@@ -201,7 +237,7 @@ func popAccount(excludeID uint, subscription string) (*model.Account, error) {
 		if account.LastCheckedAt == nil || !account.LastCheckedAt.After(freshCutoff) {
 			continue
 		}
-		if !isDispatchable(&account, subscription) {
+		if !isDispatchable(&account, subscription, allowedEmailDomains) {
 			continue
 		}
 		if !verifyDispatchable(account.AccessToken) {
@@ -267,7 +303,7 @@ func popAccount(excludeID uint, subscription string) (*model.Account, error) {
 					acc.Provider = r.provider
 				}
 				acc.Status = r.status
-				if !isDispatchable(&acc, subscription) {
+				if !isDispatchable(&acc, subscription, allowedEmailDomains) {
 					return
 				}
 				if found.CompareAndSwap(false, true) {
@@ -314,7 +350,7 @@ func buildMultiTokenArray(accounts []model.Account) []gin.H {
 	return result
 }
 
-func popMultipleAccounts(n int, subscription string) ([]*model.Account, error) {
+func popMultipleAccounts(n int, subscription string, allowedEmailDomains string) ([]*model.Account, error) {
 	if n <= 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
@@ -323,6 +359,7 @@ func popMultipleAccounts(n int, subscription string) ([]*model.Account, error) {
 		Where("status = ?", model.AccountStatusActive).
 		Where("credit_used = ?", 0)
 	q = filterAccountSubscriptionQuery(q, subscription)
+	q = filterAccountEmailDomainsQuery(q, allowedEmailDomains)
 
 	var available int64
 	q.Count(&available)
@@ -345,7 +382,7 @@ func popMultipleAccounts(n int, subscription string) ([]*model.Account, error) {
 		if candidate.LastCheckedAt == nil || !candidate.LastCheckedAt.After(freshCutoff) {
 			continue
 		}
-		if !isDispatchable(&candidate, subscription) {
+		if !isDispatchable(&candidate, subscription, allowedEmailDomains) {
 			continue
 		}
 		if !verifyDispatchable(candidate.AccessToken) {
@@ -382,7 +419,7 @@ func popMultipleAccounts(n int, subscription string) ([]*model.Account, error) {
 			candidate.Provider = result.provider
 		}
 		candidate.Status = result.status
-		if !isDispatchable(&candidate, subscription) {
+		if !isDispatchable(&candidate, subscription, allowedEmailDomains) {
 			continue
 		}
 		if !verifyDispatchable(candidate.AccessToken) {
@@ -583,7 +620,7 @@ func streamFillTokenAccounts(c *gin.Context, item tokenStreamCard, needed int, i
 	sent := 0
 	accountIDStrs := make([]string, 0, needed)
 	for sent < needed {
-		account, err := popAccount(0, item.card.Subscription)
+		account, err := popAccount(0, item.card.Subscription, item.card.AllowedEmailDomains)
 		if err != nil {
 			streamTokenEvent(c, "fail", gin.H{
 				"status":  http.StatusServiceUnavailable,
@@ -665,7 +702,7 @@ func processOneCode(c *gin.Context, code string) ([]gin.H, gin.H, int) {
 
 	now := time.Now()
 	if isMulti {
-		accounts, err := popMultipleAccounts(card.AccountCount, card.Subscription)
+		accounts, err := popMultipleAccounts(card.AccountCount, card.Subscription, card.AllowedEmailDomains)
 		if err != nil {
 			return nil, gin.H{"code": 2, "message": "账号池账号不足: " + code}, http.StatusServiceUnavailable
 		}
@@ -690,7 +727,7 @@ func processOneCode(c *gin.Context, code string) ([]gin.H, gin.H, int) {
 		return buildMultiTokenArray(mods), nil, 0
 	}
 
-	account, err := popAccount(0, card.Subscription)
+	account, err := popAccount(0, card.Subscription, card.AllowedEmailDomains)
 	if err != nil {
 		return nil, gin.H{"code": 2, "message": "账号池已空: " + code}, http.StatusServiceUnavailable
 	}

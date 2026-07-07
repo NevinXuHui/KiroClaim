@@ -125,6 +125,7 @@ func main() {
 		admin.GET("/accounts/import/status/:taskId", handler.ImportStatus)
 		admin.GET("/accounts", handler.ListAccounts)
 		admin.GET("/accounts/subscription-stats", handler.AccountSubscriptionStats)
+		admin.GET("/accounts/email-domains", handler.AccountEmailDomains)
 		admin.GET("/accounts/:id/detail", handler.AccountDetail)
 		admin.GET("/accounts/:id/models", handler.AccountModels)
 		admin.POST("/accounts/:id/refresh", handler.RefreshAccount)

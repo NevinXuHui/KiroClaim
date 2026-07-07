@@ -82,10 +82,11 @@ const (
 
 type Card struct {
 	gorm.Model
-	Code         string `gorm:"type:varchar(255);uniqueIndex;not null"`
-	UsedAt       *time.Time
-	AccountCount int    `gorm:"default:1"`
-	Subscription string `gorm:"type:varchar(50);default:''"`
+	Code                string `gorm:"type:varchar(255);uniqueIndex;not null"`
+	UsedAt              *time.Time
+	AccountCount        int    `gorm:"default:1"`
+	Subscription        string `gorm:"type:varchar(50);default:''"`
+	AllowedEmailDomains string `gorm:"type:varchar(500);default:''"` // 允许的邮箱域名，逗号分隔，如 "gmail.com,outlook.com"
 }
 
 type CardAccount struct {

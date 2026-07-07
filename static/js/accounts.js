@@ -385,29 +385,75 @@ function switchImportTab(mode) {
   }
 }
 
-// 处理文件上传
+// 处理文件上传（支持多文件）
 function handleImportFile(input) {
-  const file = input.files[0];
-  if (!file) return;
+  const files = Array.from(input.files);
+  if (!files.length) return;
 
   const fileNameEl = document.getElementById('importFileName');
   const previewEl = document.getElementById('importFilePreview');
   
-  fileNameEl.textContent = file.name;
+  // 更新文件名显示
+  if (files.length === 1) {
+    fileNameEl.textContent = files[0].name;
+  } else {
+    fileNameEl.textContent = `已选择 ${files.length} 个文件`;
+  }
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const content = e.target.result;
-    
-    // 将文件内容存储到 textarea 中
-    document.getElementById('importJson').value = content;
+  // 读取所有文件并合并内容
+  const readPromises = files.map(file => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve({ name: file.name, content: e.target.result });
+      reader.onerror = e => reject(e);
+      reader.readAsText(file);
+    });
+  });
+
+  Promise.all(readPromises).then(results => {
+    // 合并所有文件内容
+    const allAccounts = [];
+    const fileInfos = [];
+
+    results.forEach(({ name, content }) => {
+      try {
+        // 尝试解析 JSON
+        let parsed = JSON.parse(content);
+        const accounts = Array.isArray(parsed) ? parsed : [parsed];
+        allAccounts.push(...accounts);
+        fileInfos.push(`${name}: ${accounts.length} 条`);
+      } catch (e) {
+        // 如果标准 JSON 失败，尝试 JSONL 格式
+        try {
+          const lines = content.split('\n').filter(line => line.trim());
+          const accounts = lines.map(line => JSON.parse(line.trim()));
+          allAccounts.push(...accounts);
+          fileInfos.push(`${name}: ${accounts.length} 条 (JSONL)`);
+        } catch (jsonlError) {
+          fileInfos.push(`${name}: 解析失败 - ${e.message}`);
+        }
+      }
+    });
+
+    // 将合并后的内容存储到 textarea
+    document.getElementById('importJson').value = JSON.stringify(allAccounts, null, 2);
     
     // 显示预览
-    const preview = content.length > 500 ? content.substring(0, 500) + '\n\n... (文件过长，仅显示前 500 字符)' : content;
-    previewEl.textContent = preview;
+    const previewText = [
+      `共 ${files.length} 个文件，合计 ${allAccounts.length} 条账号数据\n`,
+      ...fileInfos,
+      '\n--- 数据预览 ---',
+      JSON.stringify(allAccounts.slice(0, 3), null, 2),
+      allAccounts.length > 3 ? `\n... 还有 ${allAccounts.length - 3} 条数据未显示` : ''
+    ].join('\n');
+    
+    previewEl.textContent = previewText;
     previewEl.style.display = 'block';
-  };
-  reader.readAsText(file);
+  }).catch(err => {
+    fileNameEl.textContent = '文件读取失败';
+    previewEl.textContent = '错误：' + err.message;
+    previewEl.style.display = 'block';
+  });
 }
 
 // 清空导入数据

@@ -15,34 +15,37 @@ import (
 )
 
 type cardListItem struct {
-	ID           uint
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Code         string
-	UsedAt       *time.Time
-	AccountCount int
-	Subscription string
-	Status       string
+	ID                  uint
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	Code                string
+	UsedAt              *time.Time
+	AccountCount        int
+	Subscription        string
+	Status              string
+	AllowedEmailDomains string
 }
 
 func buildCardListItem(card model.Card) cardListItem {
 	return cardListItem{
-		ID:           card.ID,
-		CreatedAt:    card.CreatedAt,
-		UpdatedAt:    card.UpdatedAt,
-		Code:         card.Code,
-		UsedAt:       card.UsedAt,
-		AccountCount: card.AccountCount,
-		Subscription: card.Subscription,
-		Status:       cardStatusFromUsedAt(card.UsedAt),
+		ID:                  card.ID,
+		CreatedAt:           card.CreatedAt,
+		UpdatedAt:           card.UpdatedAt,
+		Code:                card.Code,
+		UsedAt:              card.UsedAt,
+		AccountCount:        card.AccountCount,
+		Subscription:        card.Subscription,
+		Status:              cardStatusFromUsedAt(card.UsedAt),
+		AllowedEmailDomains: card.AllowedEmailDomains,
 	}
 }
 
 func GenerateCards(c *gin.Context) {
 	var req struct {
-		Count        int    `json:"count" binding:"required,min=1,max=500"`
-		Subscription string `json:"subscription"`
-		AccountCount int    `json:"account_count" binding:"required,min=1"`
+		Count               int    `json:"count" binding:"required,min=1,max=500"`
+		Subscription        string `json:"subscription"`
+		AccountCount        int    `json:"account_count" binding:"required,min=1"`
+		AllowedEmailDomains string `json:"allowed_email_domains"` // 允许的邮箱域名，逗号分隔
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
@@ -64,13 +67,17 @@ func GenerateCards(c *gin.Context) {
 		return
 	}
 
+	// 规范化邮箱域名
+	allowedEmailDomains := normalizeEmailDomains(req.AllowedEmailDomains)
+
 	codes := make([]string, 0, req.Count)
 	for i := 0; i < req.Count; i++ {
 		code := "KIRO-" + generateCode("upper", 12, "-", 4)
 		card := model.Card{
-			Code:         code,
-			AccountCount: req.AccountCount,
-			Subscription: subscription,
+			Code:                code,
+			AccountCount:        req.AccountCount,
+			Subscription:        subscription,
+			AllowedEmailDomains: allowedEmailDomains,
 		}
 		if err := database.DB.Create(&card).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": "写入失败: " + err.Error()})
@@ -232,6 +239,54 @@ func splitGroups(s string, size int, sep string) string {
 		parts = append(parts, s[i:end])
 	}
 	return strings.Join(parts, sep)
+}
+
+// normalizeEmailDomains 规范化邮箱域名列表
+func normalizeEmailDomains(domains string) string {
+	if domains == "" {
+		return ""
+	}
+	// 分割、去除空白、去重
+	parts := strings.Split(domains, ",")
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		domain := strings.TrimSpace(part)
+		domain = strings.ToLower(domain)
+		// 确保域名格式正确
+		if domain != "" && !seen[domain] {
+			// 移除开头的 @ 符号（如果有）
+			domain = strings.TrimPrefix(domain, "@")
+			if domain != "" {
+				seen[domain] = true
+				result = append(result, domain)
+			}
+		}
+	}
+	return strings.Join(result, ",")
+}
+
+// emailMatchesDomains 检查邮箱是否匹配允许的域名列表
+func emailMatchesDomains(email string, allowedDomains string) bool {
+	if allowedDomains == "" {
+		return true // 没有限制，所有邮箱都可以
+	}
+	if email == "" {
+		return false
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	domains := strings.Split(allowedDomains, ",")
+	for _, domain := range domains {
+		domain = strings.TrimSpace(domain)
+		if domain == "" {
+			continue
+		}
+		// 检查邮箱是否以 @domain 结尾
+		if strings.HasSuffix(email, "@"+domain) {
+			return true
+		}
+	}
+	return false
 }
 
 func ListCardLogs(c *gin.Context) {

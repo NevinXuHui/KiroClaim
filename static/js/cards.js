@@ -3,6 +3,7 @@
 let cardStatusFilter = '';
 let cardKeyword = '';
 let genSubscription = '';
+let genEmailDomains = []; // 存储选中的邮箱域名
 let selectedCardIds = new Set();
 
 function escapeHtml(value) {
@@ -92,11 +93,12 @@ async function loadCards(page = 1) {
     const multiLabel = c.AccountCount > 1 ? `<span class="k-badge" style="background:#eff6ff;color:#1d4ed8">${c.AccountCount}号</span>` : '';
     const subscription = cardSubscriptionLabel(c.Subscription || '');
     const status = c.Status || (c.UsedAt ? 'active' : 'unused');
+    const emailDomainLabel = c.AllowedEmailDomains ? `<span class="k-badge" style="background:#fef3c7;color:#92400e;font-size:11px" title="限制邮箱域名: ${escapeAttr(c.AllowedEmailDomains)}">🔒${escapeHtml(c.AllowedEmailDomains.split(',')[0])}${c.AllowedEmailDomains.split(',').length > 1 ? '...' : ''}</span>` : '';
     return `<tr>
       <td data-label="选择"><input type="checkbox" class="k-checkbox" ${checked} onchange="toggleCardSelect(${c.ID}, this.checked)"></td>
       <td data-label="ID">${c.ID}</td>
       <td data-label="序列号"><code style="background:#f1f1f1;padding:2px 4px;white-space:nowrap">${escapeHtml(c.Code)}</code></td>
-      <td data-label="账号订阅" style="font-size:12px;white-space:nowrap">${escapeHtml(subscription)} ${multiLabel}</td>
+      <td data-label="账号订阅" style="font-size:12px;white-space:nowrap">${escapeHtml(subscription)} ${multiLabel} ${emailDomainLabel}</td>
       <td data-label="状态">${cardStatusBadge(status)}</td>
       <td data-label="操作">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -155,13 +157,107 @@ function updateModeHint() {
   if (!hint) return;
   const accountText = `每张绑定 ${accountCount} 个账号`;
   const subscriptionText = genSubscription ? cardSubscriptionLabel(genSubscription) : '请先选择账号订阅';
-  hint.textContent = `将生成 ${count} 张卡密，${accountText}，账号订阅：${subscriptionText}。`;
+  const domainText = genEmailDomains.length > 0 ? `，限制域名：${genEmailDomains.join(', ')}` : '';
+  hint.textContent = `将生成 ${count} 张卡密，${accountText}，账号订阅：${subscriptionText}${domainText}。`;
 }
 
 async function showGenerateModal() {
   document.getElementById('generateModal').classList.add('active');
   await loadCardSubscriptionStats();
+  await loadEmailDomains();
   updateModeHint();
+}
+
+async function loadEmailDomains() {
+  const r = await api('GET', '/admin/accounts/email-domains');
+  const dropdown = document.getElementById('genEmailDomainsDropdown');
+  if (!dropdown) return;
+  const menu = document.getElementById('genEmailDomainsMenu');
+  if (!menu) return;
+
+  if (r.code !== 0 || !Array.isArray(r.data)) {
+    genEmailDomains = [];
+    updateEmailDomainsDisplay();
+    menu.innerHTML = '<div class="k-dropdown-item disabled">域名加载失败</div>';
+    return;
+  }
+
+  const domains = r.data.map(function(it) {
+    return {
+      domain: String(it.domain || '').trim(),
+      unusedCount: it.unusedCount || 0,
+      totalCount: it.totalCount || 0
+    };
+  }).filter(function(it) {
+    return !!it.domain;
+  });
+
+  if (!domains.length) {
+    genEmailDomains = [];
+    updateEmailDomainsDisplay();
+    menu.innerHTML = '<div class="k-dropdown-item disabled">暂无邮箱域名</div>';
+    return;
+  }
+
+  // 添加"不限制"选项
+  let html = '<div class="k-dropdown-item" data-domain="" onclick="toggleEmailDomain(\'\')">不限制</div>';
+  html += '<div style="border-top:1px solid #eee;margin:4px 0"></div>';
+  
+  html += domains.map(function(it) {
+    const countColor = it.unusedCount > 0 ? '#999' : '#dc2626';
+    const checked = genEmailDomains.includes(it.domain) ? '✓ ' : '';
+    return '<div class="k-dropdown-item" data-domain="' + escapeAttr(it.domain) + '" onclick="toggleEmailDomain(\'' + escapeAttr(it.domain) + '\')">' +
+      '<span id="domain-check-' + escapeAttr(it.domain) + '">' + checked + '</span>' +
+      escapeHtml(it.domain) + ' <span style="color:' + countColor + ';font-size:12px">(' + it.unusedCount + ' 可用)</span>' +
+      '</div>';
+  }).join('');
+
+  menu.innerHTML = html;
+  updateEmailDomainsDisplay();
+}
+
+function toggleEmailDomain(domain) {
+  if (domain === '') {
+    // 选择"不限制"，清空所有选择
+    genEmailDomains = [];
+  } else {
+    const index = genEmailDomains.indexOf(domain);
+    if (index > -1) {
+      genEmailDomains.splice(index, 1);
+    } else {
+      genEmailDomains.push(domain);
+    }
+  }
+  updateEmailDomainsDisplay();
+  updateEmailDomainsChecks();
+  updateModeHint();
+  // 不关闭下拉框，允许多选
+}
+
+function updateEmailDomainsDisplay() {
+  const text = document.getElementById('genEmailDomainsText');
+  if (!text) return;
+  
+  if (genEmailDomains.length === 0) {
+    text.textContent = '不限制';
+  } else if (genEmailDomains.length === 1) {
+    text.textContent = genEmailDomains[0];
+  } else {
+    text.textContent = genEmailDomains[0] + ' +' + (genEmailDomains.length - 1);
+  }
+}
+
+function updateEmailDomainsChecks() {
+  const menu = document.getElementById('genEmailDomainsMenu');
+  if (!menu) return;
+  
+  menu.querySelectorAll('.k-dropdown-item').forEach(function(item) {
+    const domain = item.getAttribute('data-domain');
+    const checkSpan = item.querySelector('[id^="domain-check-"]');
+    if (checkSpan) {
+      checkSpan.textContent = genEmailDomains.includes(domain) ? '✓ ' : '';
+    }
+  });
 }
 
 async function loadCardSubscriptionStats() {
@@ -222,11 +318,14 @@ async function loadCardSubscriptionStats() {
 function closeGenerateModal() {
   document.getElementById('generateModal').classList.remove('active');
   document.getElementById('generateResult').innerHTML = '';
+  genEmailDomains = []; // 重置邮箱域名选择
+  updateEmailDomainsDisplay();
 }
 
 async function doGenerate() {
   const count = parseInt(document.getElementById('genCount').value) || 1;
   const accountCount = getGenAccountCount(true);
+  const allowedEmailDomains = genEmailDomains.join(',');
   const resultEl = document.getElementById('generateResult');
   if (!genSubscription) {
     const msg = '请先选择账号订阅';
@@ -238,7 +337,8 @@ async function doGenerate() {
   const r = await api('POST', '/admin/cards/generate', {
     count,
     account_count: accountCount,
-    subscription: genSubscription
+    subscription: genSubscription,
+    allowed_email_domains: allowedEmailDomains
   });
   if (r.code === 0) {
     const codes = (r.data?.codes || []).join('\n');

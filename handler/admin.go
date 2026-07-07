@@ -680,3 +680,59 @@ func AccountSubscriptionStats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": stats})
 }
+
+// 获取账号池中的邮箱域名列表，用于生成卡密时选择域名限制
+func AccountEmailDomains(c *gin.Context) {
+	type EmailDomainStat struct {
+		Domain      string `json:"domain"`
+		UnusedCount int64  `json:"unusedCount"`
+		TotalCount  int64  `json:"totalCount"`
+	}
+
+	var accounts []model.Account
+	database.DB.Select("email, used, status").Find(&accounts)
+
+	statsByDomain := make(map[string]*EmailDomainStat)
+	for _, a := range accounts {
+		email := strings.ToLower(strings.TrimSpace(a.Email))
+		if email == "" {
+			continue
+		}
+		// 提取邮箱域名
+		atIndex := strings.LastIndex(email, "@")
+		if atIndex == -1 || atIndex == len(email)-1 {
+			continue
+		}
+		domain := email[atIndex+1:]
+		if domain == "" {
+			continue
+		}
+
+		stat, ok := statsByDomain[domain]
+		if !ok {
+			stat = &EmailDomainStat{Domain: domain}
+			statsByDomain[domain] = stat
+		}
+		stat.TotalCount++
+		if !a.Used && a.Status == model.AccountStatusActive {
+			stat.UnusedCount++
+		}
+	}
+
+	stats := make([]EmailDomainStat, 0, len(statsByDomain))
+	for _, stat := range statsByDomain {
+		stats = append(stats, *stat)
+	}
+	// 按可用数量、总数量、域名排序
+	sort.SliceStable(stats, func(i, j int) bool {
+		if stats[i].UnusedCount != stats[j].UnusedCount {
+			return stats[i].UnusedCount > stats[j].UnusedCount
+		}
+		if stats[i].TotalCount != stats[j].TotalCount {
+			return stats[i].TotalCount > stats[j].TotalCount
+		}
+		return stats[i].Domain < stats[j].Domain
+	})
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": stats})
+}
