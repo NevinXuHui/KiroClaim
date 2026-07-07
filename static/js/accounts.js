@@ -901,9 +901,15 @@ async function batchDeleteAccounts() {
   }
 }
 
-// 一键清理所有已封禁账号
+// 一键清理所有已封禁账号（高危操作，双重确认）
 async function deleteBannedAccounts() {
-  if (!confirm('确认删除全部「已封禁」状态的账号？此操作不可恢复')) return;
+  if (!confirm('此操作将删除全部【已封禁】状态的账号，且不可恢复！\n\n确定要继续吗？')) return;
+  var input = prompt('请输入「确认」两个字以确认操作：');
+  if (input !== '确认') {
+    showToast('操作已取消', 'info');
+    return;
+  }
+  
   const r = await api('POST', '/admin/accounts/delete-by-status', { status: 'suspended' });
   if (r.code === 0) {
     showToast(`已清理 ${r.data?.deleted || 0} 个封禁账号`, 'success');
@@ -1059,6 +1065,7 @@ async function loadAssignedAccounts(page = 1) {
       </td>
     </tr>`;
   }).join('');
+  renderPagination('assignedPaginationTop', r.data.total, 15, page, loadAssignedAccounts);
   renderPagination('assignedPagination', r.data.total, 15, page, loadAssignedAccounts);
 }
 

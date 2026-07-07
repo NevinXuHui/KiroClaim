@@ -27,8 +27,17 @@ async function loadSettings() {
   document.getElementById('settingAutoUpdateEnabled').checked = !!d.autoUpdateEnabled;
   document.getElementById('settingCardKeyPrefix').value = d.cardKeyPrefix || '';
   document.getElementById('settingCardKeySuffix').value = d.cardKeySuffix || '';
+  document.getElementById('settingAutoRefreshEnabled').checked = !!d.autoRefreshEnabled;
+  document.getElementById('settingAutoRefreshIntervalMinutes').value = Number.isFinite(Number(d.autoRefreshIntervalMinutes)) ? Number(d.autoRefreshIntervalMinutes) : 60;
+  toggleAutoRefreshInterval();
   var state = document.getElementById('settingCaptchaSecretState');
   if (state) state.textContent = d.captchaSecretConfigured ? 'Secret Key 已配置，留空保存不会覆盖。' : 'Secret Key 尚未配置。';
+}
+
+function toggleAutoRefreshInterval() {
+  var enabled = document.getElementById('settingAutoRefreshEnabled').checked;
+  var field = document.getElementById('autoRefreshIntervalField');
+  if (field) field.style.display = enabled ? 'block' : 'none';
 }
 
 function readIntSetting(id, fallback) {
@@ -57,7 +66,9 @@ async function saveSettings() {
     logCompress: document.getElementById('settingLogCompress').checked,
     autoUpdateEnabled: document.getElementById('settingAutoUpdateEnabled').checked,
     cardKeyPrefix: document.getElementById('settingCardKeyPrefix').value.trim(),
-    cardKeySuffix: document.getElementById('settingCardKeySuffix').value.trim()
+    cardKeySuffix: document.getElementById('settingCardKeySuffix').value.trim(),
+    autoRefreshEnabled: document.getElementById('settingAutoRefreshEnabled').checked,
+    autoRefreshIntervalMinutes: readIntSetting('settingAutoRefreshIntervalMinutes', 60)
   };
   var result = document.getElementById('settingsResult');
   if (result) result.innerHTML = '<div style="color:var(--text-muted);font-size:13px">正在保存...</div>';

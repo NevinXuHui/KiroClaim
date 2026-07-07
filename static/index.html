@@ -269,6 +269,7 @@
               </div>
               <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="resetAssignedFilters()">重置</button>
             </div>
+            <div class="pagination" id="assignedPaginationTop"></div>
             <div class="account-table-scroll">
               <table>
                 <thead>
@@ -537,6 +538,18 @@
                   </div>
                   <input type="checkbox" class="k-checkbox" id="settingAutoUpdateEnabled">
                 </div>
+                <div class="settings-toggle-card">
+                  <div>
+                    <strong>账号自动刷新</strong>
+                    <small>后台定时刷新所有活跃账号的健康状态和额度使用情况</small>
+                  </div>
+                  <input type="checkbox" class="k-checkbox" id="settingAutoRefreshEnabled" onchange="toggleAutoRefreshInterval()">
+                </div>
+                <div class="settings-field" id="autoRefreshIntervalField" style="display:none">
+                  <label class="settings-label" for="settingAutoRefreshIntervalMinutes">刷新间隔（分钟）</label>
+                  <input class="k-input" type="number" id="settingAutoRefreshIntervalMinutes" min="5" value="60">
+                  <div class="settings-help">最小间隔 5 分钟，建议设置为 30-120 分钟</div>
+                </div>
               </div>
             </div>
             <div id="settingsResult" style="margin-top:18px"></div>
@@ -648,7 +661,7 @@
   <script src="/static/js/auth.js?v=1783433399"></script>
   <script src="/static/js/api.js?v=1783433399"></script>
   <script src="/static/js/dashboard.js?v=1783433399"></script>
-  <script src="/static/js/accounts.js?v=1783437200"></script>
+  <script src="/static/js/accounts.js?v=1783437764"></script>
   <script src="/static/js/cards.js?v=1783437236"></script>
   <script src="/static/js/export.js?v=1783433399"></script>
   <script src="/static/js/logs.js?v=1783436439"></script>

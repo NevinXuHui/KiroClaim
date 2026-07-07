@@ -39,6 +39,8 @@ type AppSettings struct {
 	AutoUpdateEnabled           bool
 	CardKeyPrefix               string
 	CardKeySuffix               string
+	AutoRefreshEnabled          bool
+	AutoRefreshIntervalMinutes  int
 }
 
 type storedRuntimeSettings struct {
@@ -63,6 +65,8 @@ type storedRuntimeSettings struct {
 	AutoUpdateEnabled           *bool   `json:"autoUpdateEnabled,omitempty"`
 	CardKeyPrefix               *string `json:"cardKeyPrefix,omitempty"`
 	CardKeySuffix               *string `json:"cardKeySuffix,omitempty"`
+	AutoRefreshEnabled          *bool   `json:"autoRefreshEnabled,omitempty"`
+	AutoRefreshIntervalMinutes  *int    `json:"autoRefreshIntervalMinutes,omitempty"`
 }
 
 var (
@@ -94,6 +98,8 @@ func LoadSettingsFromEnv() {
 		AutoUpdateEnabled:           envBool("AUTO_UPDATE_ENABLED", false),
 		CardKeyPrefix:               os.Getenv("CARD_KEY_PREFIX"),
 		CardKeySuffix:               os.Getenv("CARD_KEY_SUFFIX"),
+		AutoRefreshEnabled:          envBool("AUTO_REFRESH_ENABLED", false),
+		AutoRefreshIntervalMinutes:  envInt("AUTO_REFRESH_INTERVAL_MINUTES", 60),
 	}
 	applyStoredRuntimeSettings(&s)
 	normalizeSettings(&s)
@@ -185,6 +191,12 @@ func mergeStoredRuntimeSettings(s *AppSettings, stored storedRuntimeSettings) {
 	if stored.CardKeySuffix != nil {
 		s.CardKeySuffix = *stored.CardKeySuffix
 	}
+	if stored.AutoRefreshEnabled != nil {
+		s.AutoRefreshEnabled = *stored.AutoRefreshEnabled
+	}
+	if stored.AutoRefreshIntervalMinutes != nil {
+		s.AutoRefreshIntervalMinutes = *stored.AutoRefreshIntervalMinutes
+	}
 }
 
 func normalizeSettings(s *AppSettings) {
@@ -208,6 +220,9 @@ func normalizeSettings(s *AppSettings) {
 	}
 	if s.MinResponseMs < 0 {
 		s.MinResponseMs = 0
+	}
+	if s.AutoRefreshIntervalMinutes < 5 {
+		s.AutoRefreshIntervalMinutes = 60
 	}
 	logging := utils.NormalizeLoggingConfig(utils.LoggingConfig{
 		FileEnabled: s.LogFileEnabled,
@@ -251,6 +266,8 @@ func persistRuntimeSettings(s AppSettings) error {
 		AutoUpdateEnabled:           boolPtr(s.AutoUpdateEnabled),
 		CardKeyPrefix:               stringPtr(s.CardKeyPrefix),
 		CardKeySuffix:               stringPtr(s.CardKeySuffix),
+		AutoRefreshEnabled:          boolPtr(s.AutoRefreshEnabled),
+		AutoRefreshIntervalMinutes:  intPtr(s.AutoRefreshIntervalMinutes),
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -339,6 +356,8 @@ func AdminSettings(c *gin.Context) {
 			"autoUpdateEnabled":           s.AutoUpdateEnabled,
 			"cardKeyPrefix":               s.CardKeyPrefix,
 			"cardKeySuffix":               s.CardKeySuffix,
+			"autoRefreshEnabled":          s.AutoRefreshEnabled,
+			"autoRefreshIntervalMinutes":  s.AutoRefreshIntervalMinutes,
 		},
 	})
 }
@@ -365,6 +384,8 @@ func UpdateAdminSettings(c *gin.Context) {
 		AutoUpdateEnabled           bool   `json:"autoUpdateEnabled"`
 		CardKeyPrefix               string `json:"cardKeyPrefix"`
 		CardKeySuffix               string `json:"cardKeySuffix"`
+		AutoRefreshEnabled          bool   `json:"autoRefreshEnabled"`
+		AutoRefreshIntervalMinutes  int    `json:"autoRefreshIntervalMinutes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "请求格式错误"})
@@ -410,6 +431,10 @@ func UpdateAdminSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "日志保留天数必须大于 0"})
 		return
 	}
+	if req.AutoRefreshEnabled && req.AutoRefreshIntervalMinutes < 5 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "自动刷新间隔不能小于 5 分钟"})
+		return
+	}
 
 	settingsMu.RLock()
 	s := currentSettings
@@ -437,6 +462,8 @@ func UpdateAdminSettings(c *gin.Context) {
 	s.AutoUpdateEnabled = req.AutoUpdateEnabled
 	s.CardKeyPrefix = strings.TrimSpace(req.CardKeyPrefix)
 	s.CardKeySuffix = strings.TrimSpace(req.CardKeySuffix)
+	s.AutoRefreshEnabled = req.AutoRefreshEnabled
+	s.AutoRefreshIntervalMinutes = req.AutoRefreshIntervalMinutes
 	normalizeSettings(&s)
 
 	if s.CaptchaEnabled {
@@ -471,6 +498,9 @@ func UpdateAdminSettings(c *gin.Context) {
 	currentSettings = s
 	settingsMu.Unlock()
 	updateSecuritySettings(s)
+	
+	// 重启自动刷新调度器以应用新配置
+	RestartAccountRefreshScheduler()
 
 	AddOpLogWithCtx(c, "settings", "更新系统设置", "admin")
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "配置已保存并生效"})

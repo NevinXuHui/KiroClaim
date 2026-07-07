@@ -155,6 +155,7 @@ func main() {
 	}
 
 	handler.StartAutoUpdateScheduler()
+	handler.StartAccountRefreshScheduler()
 
 	go func() {
 		hup := make(chan os.Signal, 1)
