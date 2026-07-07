@@ -259,13 +259,45 @@ function renderAccountModalError(message) {
 
 function renderAccountDetail(data) {
   const sub = data.subscription || {};
+  
+  // 额度用量显示（带颜色）
+  let creditDisplay = '-';
+  if (data.creditLimit > 0) {
+    const creditUsed = Math.max(0, Number(data.creditUsed) || 0);
+    const creditLimit = Math.max(0, Number(data.creditLimit) || 0);
+    const creditPct = Math.min(100, Math.round(creditUsed / creditLimit * 100));
+    const creditColor = creditPct >= 90 ? '#dc2626' : creditPct >= 70 ? '#f59e0b' : 'inherit';
+    creditDisplay = `${creditUsed.toFixed(1)} / ${creditLimit.toFixed(0)} <span style="color:${creditColor}">(${creditPct}%)</span>`;
+  }
+  
+  // 格式化敏感字段显示：显示前N个字符...最后M个字符
+  const formatSecret = (str, prefixLen = 15, suffixLen = 4) => {
+    if (!str || str.length <= prefixLen + suffixLen + 3) return str;
+    return str.substring(0, prefixLen) + '...' + str.substring(str.length - suffixLen);
+  };
+  
+  // 生成带复制功能的代码块
+  const copyableCode = (value, displayValue, isSecret = false) => {
+    if (!value) return '-';
+    const escapedValue = escapeHtml(value).replace(/'/g, "\\'");
+    const display = escapeHtml(displayValue || value);
+    const className = isSecret ? 'copyable-text secret-field' : 'copyable-text';
+    return `<code class="${className}" onclick="copyToClipboard('${escapedValue}')" title="点击复制">${display}</code>`;
+  };
+  
   const rows = [
     ['ID', data.id || '-'],
     ['邮箱', data.email || '-'],
     ['用户 ID', data.userId || '-'],
     ['Subscription', sub.title || '-'],
     ['订阅类型', sub.type || '-'],
-    ['重置时间', formatUpstreamTime(data.nextDateReset)]
+    ['重置时间', formatUpstreamTime(data.nextDateReset)],
+    ['额度用量', creditDisplay],
+    ['提供商', data.provider || '-'],
+    ['区域', data.region || '-'],
+    ['Client ID', copyableCode(data.clientId, formatSecret(data.clientId, 20))],
+    ['Client Secret', copyableCode(data.clientSecret, formatSecret(data.clientSecret, 15), true)],
+    ['Refresh Token', copyableCode(data.refreshToken, formatSecret(data.refreshToken, 15), true)]
   ];
 
   return `
@@ -273,7 +305,7 @@ function renderAccountDetail(data) {
       ${rows.map(([label, value]) => `
         <div class="account-detail-row">
           <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
+          <strong>${value}</strong>
         </div>`).join('')}
     </div>`;
 }

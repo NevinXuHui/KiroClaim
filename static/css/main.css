@@ -2009,13 +2009,20 @@ textarea.k-input::-webkit-scrollbar-corner {
 }
 
 .card-log-content {
-    max-width: 640px;
+    max-width: 90vw; /* 改为视口宽度的90%，适应更宽的表格 */
+    width: 1200px; /* 设置一个较大的默认宽度 */
 }
 
 .card-log-body {
-    max-height: 400px;
+    max-height: 500px; /* 增加高度 */
+    overflow-x: auto; /* 添加横向滚动 */
     overflow-y: auto;
     padding: 0;
+}
+
+.card-log-table {
+    min-width: 100%; /* 确保表格至少占满容器 */
+    white-space: nowrap; /* 防止内容换行 */
 }
 
 .account-modal-loading {
@@ -2256,4 +2263,29 @@ textarea.k-input::-webkit-scrollbar-corner {
 
 .copyable-text:active {
     transform: scale(0.98);
+}
+
+/* 敏感字段样式 */
+.secret-field {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 11px;
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--text-muted);
+    display: inline-block;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-detail-row code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+    word-break: break-all;
 }

@@ -293,5 +293,28 @@ func ListCardLogs(c *gin.Context) {
 	cardID := c.Param("id")
 	var logs []model.CardLog
 	database.DB.Where("card_id = ?", cardID).Order("id desc").Find(&logs)
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": logs})
+	
+	// 为每条日志关联查询账号详细信息
+	type LogWithAccountInfo struct {
+		model.CardLog
+		AccountStatus      string  `json:"AccountStatus,omitempty"`
+		AccountCreditUsed  float64 `json:"AccountCreditUsed,omitempty"`
+		AccountCreditLimit float64 `json:"AccountCreditLimit,omitempty"`
+	}
+	
+	logsWithInfo := make([]LogWithAccountInfo, 0, len(logs))
+	for _, log := range logs {
+		lwi := LogWithAccountInfo{CardLog: log}
+		if log.AccountID > 0 {
+			var account model.Account
+			if err := database.DB.Select("status, credit_used, credit_limit").Where("id = ?", log.AccountID).First(&account).Error; err == nil {
+				lwi.AccountStatus = string(account.Status)
+				lwi.AccountCreditUsed = account.CreditUsed
+				lwi.AccountCreditLimit = account.CreditLimit
+			}
+		}
+		logsWithInfo = append(logsWithInfo, lwi)
+	}
+	
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": logsWithInfo})
 }

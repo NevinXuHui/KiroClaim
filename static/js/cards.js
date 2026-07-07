@@ -97,7 +97,11 @@ async function loadCards(page = 1) {
     return `<tr>
       <td data-label="选择"><input type="checkbox" class="k-checkbox" ${checked} onchange="toggleCardSelect(${c.ID}, this.checked)"></td>
       <td data-label="ID">${c.ID}</td>
-      <td data-label="序列号"><code style="background:#f1f1f1;padding:2px 4px;white-space:nowrap">${escapeHtml(c.Code)}</code></td>
+      <td data-label="序列号">
+        <code class="copyable-text" style="background:#f1f1f1;padding:2px 4px;white-space:nowrap" 
+              onclick="showCardLogs(${c.ID}, '${escapeAttr(c.Code)}')" 
+              title="点击查看详情">${escapeHtml(c.Code)}</code>
+      </td>
       <td data-label="账号订阅" style="font-size:12px;white-space:nowrap">${escapeHtml(subscription)} ${multiLabel} ${emailDomainLabel}</td>
       <td data-label="状态">${cardStatusBadge(status)}</td>
       <td data-label="操作">
@@ -454,15 +458,43 @@ async function showCardLogs(cardId, code) {
   if (!logs.length) {
     content += '<div style="text-align:center;color:#999;padding:40px;font-size:13px">暂无使用记录</div>';
   } else {
-    content += '<table class="card-log-table"><thead><tr><th>操作</th><th>账号邮箱</th><th>客户端 IP</th><th>时间</th></tr></thead><tbody>';
+    content += '<table class="card-log-table"><thead><tr><th>操作</th><th>账号邮箱</th><th>健康状态</th><th>额度用量</th><th>客户端 IP</th><th>时间</th><th>操作</th></tr></thead><tbody>';
     logs.forEach(function(log) {
       var actionLabel = log.Action === 'activate' ? '激活' : log.Action;
       var timeStr = new Date(log.CreatedAt).toLocaleString('zh-CN', {hour12: false});
+      var statusBadge = log.AccountStatus ? healthBadge(log.AccountStatus) : '<span style="color:#999;font-size:12px">-</span>';
+      
+      // 额度显示
+      var creditDisplay = '-';
+      if (log.AccountCreditLimit > 0) {
+        var creditUsed = Math.max(0, Number(log.AccountCreditUsed) || 0);
+        var creditLimit = Math.max(0, Number(log.AccountCreditLimit) || 0);
+        var creditPct = Math.min(100, Math.round(creditUsed / creditLimit * 100));
+        var creditColor = creditPct >= 90 ? '#dc2626' : creditPct >= 70 ? '#f59e0b' : 'var(--text-muted)';
+        creditDisplay = '<div style="font-size:12px;color:var(--text-muted)">' +
+          creditUsed.toFixed(1) + ' / ' + creditLimit.toFixed(0) +
+          ' <span style="color:' + creditColor + '">(' + creditPct + '%)</span>' +
+          '</div>';
+      }
+      
+      // 账号邮箱（可点击查看详情）
+      var emailDisplay = log.AccountID 
+        ? '<span class="copyable-text" onclick="showAccountDetail(' + log.AccountID + ')" title="点击查看账号详情">' + 
+          escapeHtml(log.Email || ('ID:' + log.AccountID)) + 
+          '</span>'
+        : escapeHtml(log.Email || '-');
+      
       content += '<tr>';
       content += '<td data-label="操作" class="card-log-action" style="font-size:13px">' + escapeHtml(actionLabel) + '</td>';
-      content += '<td data-label="账号邮箱" class="card-log-email" style="font-size:12px;font-family:monospace">' + escapeHtml(log.Email || ('ID:' + log.AccountID)) + '</td>';
+      content += '<td data-label="账号邮箱" class="card-log-email" style="font-size:12px;font-family:monospace">' + emailDisplay + '</td>';
+      content += '<td data-label="健康状态" class="card-log-status">' + statusBadge + '</td>';
+      content += '<td data-label="额度用量" class="card-log-credit">' + creditDisplay + '</td>';
       content += '<td data-label="客户端 IP" class="card-log-ip" style="font-size:12px;color:#999">' + escapeHtml(log.ClientIP || '-') + '</td>';
       content += '<td data-label="时间" class="card-log-time" style="font-size:12px;color:#999;white-space:nowrap">' + escapeHtml(timeStr) + '</td>';
+      content += '<td data-label="操作" class="card-log-actions">' +
+        '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccountInCardLog(' + log.AccountID + ', this)" ' +
+        (log.AccountID ? '' : 'disabled') + '>刷新</button>' +
+        '</td>';
       content += '</tr>';
     });
     content += '</tbody></table>';
@@ -470,4 +502,60 @@ async function showCardLogs(cardId, code) {
   content += '</div></div>';
   overlay.innerHTML = content;
   document.body.appendChild(overlay);
+}
+
+// 在卡密详情中刷新账号
+async function refreshAccountInCardLog(accountId, btn) {
+  if (!accountId || !btn) return;
+  
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '刷新中...';
+  
+  const r = await api('POST', '/admin/accounts/' + accountId + '/refresh');
+  if (r.code === 0) {
+    btn.textContent = '成功';
+    showToast('账号刷新成功', 'success');
+    
+    // 1秒后重新加载卡密详情
+    setTimeout(() => {
+      const modal = document.getElementById('cardLogModal');
+      if (modal) {
+        // 获取卡密ID和代码（从模态框标题中提取）
+        const titleEl = modal.querySelector('.modal-title');
+        if (titleEl) {
+          const titleText = titleEl.textContent;
+          const match = titleText.match(/卡密使用记录 - (.+)$/);
+          if (match) {
+            const code = match[1];
+            // 从当前页面查找对应的卡密ID
+            const cardsBody = document.getElementById('cardsBody');
+            if (cardsBody) {
+              const rows = cardsBody.querySelectorAll('tr');
+              for (let row of rows) {
+                const codeEl = row.querySelector('code');
+                if (codeEl && codeEl.textContent === code) {
+                  const idCell = row.querySelector('td[data-label="ID"]');
+                  if (idCell) {
+                    const cardId = idCell.textContent;
+                    showCardLogs(cardId, code);
+                    return;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 1000);
+  } else {
+    btn.textContent = '失败';
+    showToast('刷新失败：' + (r.message || '未知错误'), 'error');
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 2000);
+  }
 }

@@ -295,6 +295,10 @@ func buildUsageDetailPayload(accountID uint, usage *usageInfo, raw map[string]in
 		email = "-"
 	}
 
+	// 从数据库读取账号完整信息
+	var account model.Account
+	database.DB.First(&account, accountID)
+
 	return gin.H{
 		"id":             accountID,
 		"source":         "upstream",
@@ -314,6 +318,14 @@ func buildUsageDetailPayload(accountID uint, usage *usageInfo, raw map[string]in
 			"limit":   limit,
 			"percent": usagePercent(current, limit),
 		},
+		// 添加账号凭证信息
+		"clientId":     account.ClientId,
+		"clientSecret": account.ClientSecret,
+		"refreshToken": account.RefreshToken,
+		"provider":     account.Provider,
+		"region":       account.Region,
+		"creditUsed":   current,
+		"creditLimit":  limit,
 	}
 }
 
