@@ -141,6 +141,24 @@ func RefreshAccount(c *gin.Context) {
 		return
 	}
 
+	// 如果账号已被封禁，不允许通过刷新恢复
+	if account.Status == model.AccountStatusSuspended {
+		c.JSON(http.StatusOK, gin.H{
+			"code":    1,
+			"message": "封禁账号不允许刷新",
+			"data": gin.H{
+				"id":            account.ID,
+				"status":        account.Status,
+				"email":         account.Email,
+				"subscription":  account.Subscription,
+				"creditUsed":    account.CreditUsed,
+				"creditLimit":   account.CreditLimit,
+				"lastCheckedAt": account.LastCheckedAt,
+			},
+		})
+		return
+	}
+
 	result := checkAccountHealth(*account)
 	if err := applyHealthResult(account.ID, result); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": "保存刷新结果失败: " + err.Error()})

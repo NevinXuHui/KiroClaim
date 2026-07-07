@@ -2,6 +2,9 @@
 
 var logActionFilter = '';
 
+// 每页显示数量（从 localStorage 读取，默认 20）
+var logPageSize = parseInt(localStorage.getItem('logPageSize') || '20');
+
 // 操作类型中文映射
 var actionLabels = {
   import: '导入',

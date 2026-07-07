@@ -220,6 +220,7 @@ func buildHealthUpdates(r healthResult, now time.Time) map[string]interface{} {
 //  3. GET ListAvailableModels 拉取账号可用模型
 //
 // 任何一步收到 HTTP 403 都判定为封号。
+// 临时错误时保持原状态（如果原本是 suspended，则仍为 suspended；如果是 active，则仍为 active）。
 func checkAccountHealth(a model.Account) healthResult {
 	if a.RefreshToken == "" {
 		return healthResult{status: model.AccountStatusSuspended, errMsg: "缺少 refreshToken"}
@@ -241,8 +242,8 @@ func checkAccountHealth(a model.Account) healthResult {
 		if rStatus == http.StatusForbidden {
 			return healthResult{status: model.AccountStatusSuspended, errMsg: "刷新 token 403: " + rErr}
 		}
-		// 临时错误（网络、5xx、非 403 的 4xx）保持 active，下一轮再重试。
-		return healthResult{status: model.AccountStatusActive, errMsg: rErr}
+		// 临时错误（网络、5xx、非 403 的 4xx）保持原状态，下一轮再重试。
+		return healthResult{status: a.Status, errMsg: rErr}
 	}
 
 	// Step 2: getUsageLimits
@@ -258,7 +259,7 @@ func checkAccountHealth(a model.Account) healthResult {
 			}
 		}
 		return healthResult{
-			status:     model.AccountStatusActive,
+			status:     a.Status,
 			newToken:   accessToken,
 			newRefresh: newRefresh,
 			provider:   provider,
@@ -281,7 +282,7 @@ func checkAccountHealth(a model.Account) healthResult {
 		}
 	} else if status != http.StatusOK {
 		return healthResult{
-			status:       model.AccountStatusActive,
+			status:       a.Status,
 			newToken:     accessToken,
 			newRefresh:   newRefresh,
 			provider:     provider,
@@ -293,8 +294,15 @@ func checkAccountHealth(a model.Account) healthResult {
 		}
 	}
 
+	// 所有检查通过，但如果原本是手动封禁的，应保持封禁状态
+	finalStatus := model.AccountStatusActive
+	if a.Status == model.AccountStatusSuspended {
+		// 如果原本被标记为封禁，即使检查通过也保持封禁
+		finalStatus = model.AccountStatusSuspended
+	}
+
 	return healthResult{
-		status:       model.AccountStatusActive,
+		status:       finalStatus,
 		newToken:     accessToken,
 		newRefresh:   newRefresh,
 		provider:     provider,

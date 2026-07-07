@@ -74,6 +74,12 @@ async function loadAccounts(page = 1) {
          </div>` 
       : '';
     
+    // 封禁账号禁用刷新按钮
+    const isSuspended = a.Status === 'suspended';
+    const refreshBtn = isSuspended 
+      ? `<button class="ui-btn ui-btn-secondary ui-btn-sm" disabled title="封禁账号不允许刷新">刷新</button>`
+      : `<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccount(${a.ID}, 'accounts', this)">刷新</button>`;
+    
     return `<tr>
       <td data-label="选择"><input type="checkbox" class="k-checkbox" ${checked} onchange="toggleAccountSelect(${a.ID}, this.checked)"></td>
       <td data-label="ID" style="color:#999">${a.ID}</td>
@@ -94,7 +100,7 @@ async function loadAccounts(page = 1) {
       <td data-label="操作" class="account-action-cell">
         <div class="account-actions">
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="showAccountDetail(${a.ID})">详细</button>
-          <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccount(${a.ID}, 'accounts', this)">刷新</button>
+          ${refreshBtn}
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="exportSingleAccount(${a.ID})">导出</button>
           <button class="ui-btn ui-btn-danger ui-btn-sm" onclick="deleteAccount(${a.ID})">删除</button>
         </div>
@@ -1020,6 +1026,12 @@ async function loadAssignedAccounts(page = 1) {
          </div>` 
       : '';
 
+    // 封禁账号禁用刷新按钮
+    const isSuspended = a.Status === 'suspended';
+    const refreshBtn = isSuspended 
+      ? `<button class="ui-btn ui-btn-secondary ui-btn-sm" disabled title="封禁账号不允许刷新">刷新</button>`
+      : `<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccount(${a.ID}, 'assigned', this)">刷新</button>`;
+
     return `<tr>
       <td data-label="ID" style="color:#999">${a.ID}</td>
       <td data-label="邮箱" class="account-email-cell">
@@ -1040,7 +1052,7 @@ async function loadAssignedAccounts(page = 1) {
       <td data-label="操作" class="account-action-cell">
         <div class="account-actions">
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="showAccountDetail(${a.ID})">详细</button>
-          <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccount(${a.ID}, 'assigned', this)">刷新</button>
+          ${refreshBtn}
           <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="exportSingleAccount(${a.ID})">导出</button>
           <button class="ui-btn ui-btn-danger ui-btn-sm" onclick="deleteAccount(${a.ID}, 'assigned')">删除</button>
         </div>

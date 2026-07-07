@@ -523,6 +523,11 @@ async function showCardLogs(cardId, code) {
           '</span>'
         : escapeHtml(log.Email || '-');
       
+      // 封禁账号禁用刷新按钮
+      var isSuspended = log.AccountStatus === 'suspended';
+      var refreshDisabled = !log.AccountID || isSuspended;
+      var refreshTitle = isSuspended ? '封禁账号不允许刷新' : '';
+      
       content += '<tr>';
       content += '<td data-label="操作" class="card-log-action" style="font-size:13px">' + escapeHtml(actionLabel) + '</td>';
       content += '<td data-label="账号邮箱" class="card-log-email" style="font-size:12px;font-family:monospace">' + emailDisplay + '</td>';
@@ -532,7 +537,7 @@ async function showCardLogs(cardId, code) {
       content += '<td data-label="时间" class="card-log-time" style="font-size:12px;color:#999;white-space:nowrap">' + escapeHtml(timeStr) + '</td>';
       content += '<td data-label="操作" class="card-log-actions">' +
         '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccountInCardLog(' + log.AccountID + ', this)" ' +
-        (log.AccountID ? '' : 'disabled') + '>刷新</button>' +
+        (refreshDisabled ? 'disabled' : '') + (refreshTitle ? ' title="' + refreshTitle + '"' : '') + '>刷新</button>' +
         '</td>';
       content += '</tr>';
     });
@@ -629,25 +634,26 @@ async function exportCard(cardId) {
       return;
     }
     
-    // 获取每个账号的详细信息
-    const accounts = [];
-    for (const accountId of accountIds) {
-      const r = await api('GET', '/admin/accounts/' + accountId + '/detail');
-      if (r.code === 0 && r.data) {
-        accounts.push({
-          clientId: r.data.clientId || '',
-          clientSecret: r.data.clientSecret || '',
-          creditLimit: r.data.creditLimit || 0,
-          creditUsed: r.data.creditUsed || 0,
-          email: r.data.email || '',
-          provider: r.data.provider || 'idc',
-          refreshToken: r.data.refreshToken || '',
-          region: r.data.region || 'us-east-1',
-          subscription: r.data.subscription?.title || '',
-          time: formatExportTime(r.data.fetchedAt || new Date().toISOString())
-        });
-      }
-    }
+    // 并发获取每个账号的详细信息
+    const accountRequests = accountIds.map(accountId => 
+      api('GET', '/admin/accounts/' + accountId + '/detail')
+    );
+    
+    const responses = await Promise.all(accountRequests);
+    const accounts = responses
+      .filter(r => r.code === 0 && r.data)
+      .map(r => ({
+        clientId: r.data.clientId || '',
+        clientSecret: r.data.clientSecret || '',
+        creditLimit: r.data.creditLimit || 0,
+        creditUsed: r.data.creditUsed || 0,
+        email: r.data.email || '',
+        provider: r.data.provider || 'idc',
+        refreshToken: r.data.refreshToken || '',
+        region: r.data.region || 'us-east-1',
+        subscription: r.data.subscription?.title || '',
+        time: formatExportTime(r.data.fetchedAt || new Date().toISOString())
+      }));
     
     if (accounts.length === 0) {
       showToast('无法获取账号详细信息', 'error');
