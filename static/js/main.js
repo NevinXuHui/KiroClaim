@@ -29,6 +29,8 @@ function switchTab(name, el) {
   // 切换到账号页时触发加载
   if (name === 'accounts') {
     loadAccounts(1);
+    loadAccountSubscriptionFilter();
+    loadAccountEmailDomainFilter();
   }
   if (name === 'assigned') loadAssignedAccounts(1);
   if (name === 'cards') loadCards(1);
@@ -62,7 +64,11 @@ function initApp() {
     document.getElementById('tab-' + savedTab).classList.add('active');
 
     if (savedTab === 'dashboard') { loadStats(); startDashboardAutoRefresh(); }
-    if (savedTab === 'accounts') loadAccounts(1);
+    if (savedTab === 'accounts') {
+      loadAccounts(1);
+      loadAccountSubscriptionFilter();
+      loadAccountEmailDomainFilter();
+    }
     if (savedTab === 'assigned') loadAssignedAccounts(1);
     if (savedTab === 'cards') loadCards(1);
     if (savedTab === 'logs') loadLogs(1);

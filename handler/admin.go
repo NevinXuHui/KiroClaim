@@ -341,7 +341,7 @@ func processImport(taskID string, accounts []map[string]interface{}) {
 	})
 }
 
-// GET /admin/accounts?page=1&size=20&status=active&used=false&keyword=xxx&subscription=KIRO%20FREE
+// GET /admin/accounts?page=1&size=20&status=active&used=false&keyword=xxx&subscription=KIRO%20FREE&email_domain=gmail.com
 func ListAccounts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
@@ -349,6 +349,7 @@ func ListAccounts(c *gin.Context) {
 	usedFilter := c.Query("used")
 	keyword := c.Query("keyword")
 	subscriptionFilter := c.Query("subscription")
+	emailDomainFilter := c.Query("email_domain")
 	createdFrom := c.Query("created_from")
 	createdTo := c.Query("created_to")
 	if page < 1 {
@@ -378,6 +379,10 @@ func ListAccounts(c *gin.Context) {
 	if subscriptionFilter != "" {
 		q = q.Where("subscription = ?", subscriptionFilter)
 	}
+	// 按邮箱域名筛选。
+	if emailDomainFilter != "" {
+		q = q.Where("email LIKE ?", "%@"+emailDomainFilter)
+	}
 	// 按关键词搜索邮箱。
 	if keyword != "" {
 		q = q.Where("email LIKE ?", "%"+keyword+"%")
@@ -396,8 +401,27 @@ func ListAccounts(c *gin.Context) {
 	q.Count(&total)
 	q.Order("id desc").Offset((page - 1) * size).Limit(size).Find(&accounts)
 
+	// 对已兑换账号，查询关联的卡密信息
+	type AccountWithCard struct {
+		model.Account
+		CardCode string `json:"CardCode,omitempty"`
+	}
+	
+	accountsWithCard := make([]AccountWithCard, 0, len(accounts))
+	for _, acc := range accounts {
+		awc := AccountWithCard{Account: acc}
+		if acc.Used {
+			// 查询该账号关联的卡密
+			var cardLog model.CardLog
+			if err := database.DB.Where("account_id = ?", acc.ID).Order("created_at desc").First(&cardLog).Error; err == nil {
+				awc.CardCode = cardLog.Code
+			}
+		}
+		accountsWithCard = append(accountsWithCard, awc)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{
-		"total": total, "page": page, "size": size, "list": accounts,
+		"total": total, "page": page, "size": size, "list": accountsWithCard,
 	}})
 }
 

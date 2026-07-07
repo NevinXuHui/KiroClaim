@@ -2241,3 +2241,19 @@ textarea.k-input::-webkit-scrollbar-corner {
         font-size: 16px !important;
     }
 }
+
+/* 可复制文本样式 */
+.copyable-text {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px dashed transparent;
+}
+
+.copyable-text:hover {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.copyable-text:active {
+    transform: scale(0.98);
+}

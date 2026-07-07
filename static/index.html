@@ -172,6 +172,24 @@
                   <div class="k-dropdown-item selected" onclick="selectAccountSubscription('', '全部订阅')">全部订阅</div>
                 </div>
               </div>
+              <div class="k-dropdown" id="accountEmailDomainDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('accountEmailDomainDropdown')">
+                  <span id="accountEmailDomainText">全部域名</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectAccountEmailDomain('', '全部域名')">全部域名</div>
+                </div>
+              </div>
+              <div class="k-dropdown" id="accountUsedDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('accountUsedDropdown')">
+                  <span id="accountUsedText">仅未兑换</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectAccountUsed('false', '仅未兑换')">仅未兑换</div>
+                  <div class="k-dropdown-item" onclick="selectAccountUsed('true', '仅已兑换')">仅已兑换</div>
+                  <div class="k-dropdown-item" onclick="selectAccountUsed('', '全部')">全部</div>
+                </div>
+              </div>
               <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="resetAccountFilters()">重置</button>
             </div>
             <div class="account-table-scroll">
@@ -484,18 +502,18 @@
       <div class="modal-body">
         <!-- 导入方式切换 -->
         <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid #eaeaea">
-          <button class="import-tab-btn active" id="importTabText" onclick="switchImportTab('text')">粘贴文本</button>
-          <button class="import-tab-btn" id="importTabFile" onclick="switchImportTab('file')">上传文件</button>
+          <button class="import-tab-btn" id="importTabText" onclick="switchImportTab('text')">粘贴文本</button>
+          <button class="import-tab-btn active" id="importTabFile" onclick="switchImportTab('file')">上传文件</button>
         </div>
 
         <!-- 粘贴文本模式 -->
-        <div id="importModeText" style="margin-bottom: 20px;">
+        <div id="importModeText" style="margin-bottom: 20px; display:none;">
           <label style="display:block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">JSON 数据源</label>
           <textarea class="k-input" id="importJson" placeholder="请输入标准 JSON 格式数据，支持 JSON 数组或每行一个 JSON 对象"></textarea>
         </div>
 
         <!-- 上传文件模式 -->
-        <div id="importModeFile" style="margin-bottom: 20px; display:none;">
+        <div id="importModeFile" style="margin-bottom: 20px;">
           <label style="display:block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">选择文件</label>
           <input type="file" id="importFileInput" accept=".json,.txt,.jsonl" multiple style="display:none" onchange="handleImportFile(this)">
           <div style="display:flex; gap:12px; align-items:center">
@@ -572,15 +590,15 @@
 
   <!-- 页面脚本 -->
   <script src="/static/js/ui.js"></script>
-  <script src="/static/js/auth.js"></script>
-  <script src="/static/js/api.js"></script>
-  <script src="/static/js/dashboard.js"></script>
-  <script src="/static/js/accounts.js"></script>
-  <script src="/static/js/cards.js"></script>
-  <script src="/static/js/export.js"></script>
-  <script src="/static/js/logs.js"></script>
-  <script src="/static/js/settings.js"></script>
-  <script src="/static/js/version.js"></script>
-  <script src="/static/js/main.js"></script>
+  <script src="/static/js/auth.js?v=1783429008"></script>
+  <script src="/static/js/api.js?v=1783429008"></script>
+  <script src="/static/js/dashboard.js?v=1783429008"></script>
+  <script src="/static/js/accounts.js?v=1783429008"></script>
+  <script src="/static/js/cards.js?v=1783429008"></script>
+  <script src="/static/js/export.js?v=1783429008"></script>
+  <script src="/static/js/logs.js?v=1783429008"></script>
+  <script src="/static/js/settings.js?v=1783429008"></script>
+  <script src="/static/js/version.js?v=1783429008"></script>
+  <script src="/static/js/main.js?v=1783429008"></script>
 </body>
 </html>

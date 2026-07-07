@@ -77,6 +77,7 @@ document.addEventListener('click', function(e) {
 function renderPagination(containerId, total, size, current, fn) {
   var pages = Math.ceil(total / size);
   var el = document.getElementById(containerId);
+  if (!el) return; // 元素不存在则直接返回
   if (pages <= 1) { el.innerHTML = ''; return; }
   var jumpId = containerId + '_jump';
   var html = '<div style="display:flex;align-items:center;gap:12px;margin-top:24px;flex-wrap:wrap">';

@@ -1,8 +1,10 @@
 // 账号管理模块
 
-// 筛选状态（账号池仅显示未分配）
+// 筛选状态
 let accountStatusFilter = '';
 let accountSubscriptionFilter = '';
+let accountEmailDomainFilter = '';
+let accountUsedFilter = 'false'; // 默认只显示未兑换，'false'=未兑换, 'true'=已兑换, ''=全部
 let accountKeyword = '';
 
 // 批量选择
@@ -12,10 +14,11 @@ async function loadAccounts(page = 1) {
   accountKeyword = (document.getElementById('accountKeyword')?.value || '').trim();
   const createdFrom = document.getElementById('accountCreatedFrom')?.value || '';
   const createdTo = document.getElementById('accountCreatedTo')?.value || '';
-  // 账号池强制只看未分配
-  let url = `/admin/accounts?page=${page}&size=15&used=false`;
+  let url = `/admin/accounts?page=${page}&size=15`;
+  if (accountUsedFilter !== '') url += `&used=${accountUsedFilter}`;
   if (accountStatusFilter) url += `&status=${accountStatusFilter}`;
   if (accountSubscriptionFilter) url += `&subscription=${encodeURIComponent(accountSubscriptionFilter)}`;
+  if (accountEmailDomainFilter) url += `&email_domain=${encodeURIComponent(accountEmailDomainFilter)}`;
   if (accountKeyword) url += `&keyword=${encodeURIComponent(accountKeyword)}`;
   if (createdFrom) url += `&created_from=${createdFrom}`;
   if (createdTo) url += `&created_to=${createdTo}`;
@@ -23,7 +26,9 @@ async function loadAccounts(page = 1) {
   const r = await api('GET', url);
   const tbody = document.getElementById('accountsBody');
   if (r.code !== 0 || !r.data.list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:40px">暂无未分配账号</td></tr>';
+    const emptyMsg = accountUsedFilter === 'false' ? '暂无未兑换账号' : 
+                     accountUsedFilter === 'true' ? '暂无已兑换账号' : '暂无账号';
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#999;padding:40px">${emptyMsg}</td></tr>`;
     updateAccountBatchBtn();
     return;
   }
@@ -36,10 +41,28 @@ async function loadAccounts(page = 1) {
       ? `${creditUsed.toFixed(1)} / ${creditLimit.toFixed(0)}`
       : '-';
     const checked = selectedAccountIds.has(a.ID) ? 'checked' : '';
+    
+    // 邮箱地址（可复制）
+    const emailDisplay = a.Email 
+      ? `<span class="copyable-text" onclick="copyToClipboard('${escapeHtml(a.Email)}')" title="点击复制邮箱">${escapeHtml(a.Email)}</span>`
+      : '-';
+    
+    // 如果账号已兑换且有卡密信息，显示卡密（可复制）
+    const cardCodeDisplay = a.Used && a.CardCode 
+      ? `<div style="font-size:11px;color:#10b981;margin-top:4px">
+           <span class="copyable-text" onclick="copyToClipboard('${escapeHtml(a.CardCode)}')" title="点击复制卡密">
+             卡密: ${escapeHtml(a.CardCode)}
+           </span>
+         </div>` 
+      : '';
+    
     return `<tr>
       <td data-label="选择"><input type="checkbox" class="k-checkbox" ${checked} onchange="toggleAccountSelect(${a.ID}, this.checked)"></td>
       <td data-label="ID" style="color:#999">${a.ID}</td>
-      <td data-label="邮箱" class="account-email-cell">${a.Email || '-'}</td>
+      <td data-label="邮箱" class="account-email-cell">
+        ${emailDisplay}
+        ${cardCodeDisplay}
+      </td>
       <td data-label="健康状态">${healthBadge(a.Status)}</td>
       <td data-label="订阅" class="account-subscription-cell">${subscriptionBadge(a.Subscription)}</td>
       <td data-label="额度用量" class="account-usage-cell">
@@ -86,6 +109,7 @@ async function deleteAccount(id, source) {
       if (source === 'assigned') loadAssignedAccounts(1);
       else loadAccounts(1);
       loadAccountSubscriptionFilter();
+      loadAccountEmailDomainFilter();
       loadStats && loadStats();
     }, 500);
   } else {
@@ -122,6 +146,7 @@ async function refreshAccount(id, source, btn) {
       loadAccounts(1);
     }
     loadAccountSubscriptionFilter();
+    loadAccountEmailDomainFilter();
     loadStats && loadStats();
   } catch (e) {
     showToast('刷新失败：' + e.message, 'error');
@@ -337,8 +362,8 @@ function formatUpstreamTime(value) {
 // 模态框控制
 function showImportModal() {
   document.getElementById('importModal').classList.add('active');
-  // 默认显示粘贴文本模式
-  switchImportTab('text');
+  // 默认显示上传文件模式
+  switchImportTab('file');
 
   const taskId = localStorage.getItem('importTaskId');
   const total = localStorage.getItem('importTaskTotal');
@@ -601,6 +626,7 @@ async function pollImportStatus(taskId, total, resultEl, btn) {
             document.getElementById('importJson').value = '';
             loadAccounts(1);
             loadAccountSubscriptionFilter();
+            loadAccountEmailDomainFilter();
             showToast(`成功导入 ${d.imported} 个账号`, 'success');
           } else {
             showToast('没有新账号被导入', 'info');
@@ -664,10 +690,40 @@ function selectAccountSubscription(value, text) {
   loadAccounts(1);
 }
 
+// 账号邮箱域名筛选
+function selectAccountEmailDomain(value, text) {
+  accountEmailDomainFilter = value;
+  document.getElementById('accountEmailDomainText').textContent = text;
+
+  document.querySelectorAll('#accountEmailDomainDropdown .k-dropdown-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+
+  toggleDropdown('accountEmailDomainDropdown');
+  loadAccounts(1);
+}
+
+// 选择是否兑换筛选
+function selectAccountUsed(value, text) {
+  accountUsedFilter = value;
+  document.getElementById('accountUsedText').textContent = text;
+
+  document.querySelectorAll('#accountUsedDropdown .k-dropdown-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+
+  toggleDropdown('accountUsedDropdown');
+  loadAccounts(1);
+}
+
 // 重置账号筛选
 function resetAccountFilters() {
   accountStatusFilter = '';
   accountSubscriptionFilter = '';
+  accountEmailDomainFilter = '';
+  accountUsedFilter = 'false'; // 重置为默认值：仅未兑换
   accountKeyword = '';
 
   const keywordInput = document.getElementById('accountKeyword');
@@ -679,12 +735,15 @@ function resetAccountFilters() {
 
   document.getElementById('accountStatusText').textContent = '全部状态';
   document.getElementById('accountSubscriptionText').textContent = '全部订阅';
+  document.getElementById('accountEmailDomainText').textContent = '全部域名';
+  document.getElementById('accountUsedText').textContent = '仅未兑换';
 
-  document.querySelectorAll('#accountStatusDropdown .k-dropdown-item, #accountSubscriptionDropdown .k-dropdown-item').forEach(item => {
+  document.querySelectorAll('#accountStatusDropdown .k-dropdown-item, #accountSubscriptionDropdown .k-dropdown-item, #accountEmailDomainDropdown .k-dropdown-item, #accountUsedDropdown .k-dropdown-item').forEach(item => {
     item.classList.remove('selected');
   });
   document.querySelector('#accountStatusDropdown .k-dropdown-item:first-child')?.classList.add('selected');
   document.querySelector('#accountSubscriptionDropdown .k-dropdown-item:first-child')?.classList.add('selected');
+  document.querySelector('#accountEmailDomainDropdown .k-dropdown-item:first-child')?.classList.add('selected');
 
   loadAccounts(1);
 }
@@ -744,6 +803,7 @@ async function batchDeleteAccounts() {
     if (selectAll) selectAll.checked = false;
     loadAccounts(1);
     loadAccountSubscriptionFilter();
+    loadAccountEmailDomainFilter();
     loadStats();
   } else {
     showToast('批量删除失败：' + (r.message || r.msg || '未知错误'), 'error');
@@ -758,6 +818,7 @@ async function deleteBannedAccounts() {
     showToast(`已清理 ${r.data?.deleted || 0} 个封禁账号`, 'success');
     loadAccounts(1);
     loadAccountSubscriptionFilter();
+    loadAccountEmailDomainFilter();
     loadStats();
   } else {
     showToast('清理失败：' + (r.message || r.msg || '未知错误'), 'error');
@@ -780,6 +841,7 @@ async function doClearAllAccounts() {
     updateAccountBatchBtn();
     loadAccounts(1);
     loadAccountSubscriptionFilter();
+    loadAccountEmailDomainFilter();
     loadStats && loadStats();
   } else {
     showToast('清空失败：' + (r.message || r.msg || '未知错误'), 'error');
@@ -804,6 +866,30 @@ async function loadAccountSubscriptionFilter() {
     items.push(
       '<div class="k-dropdown-item ' + selected + '" ' +
       'onclick=\'selectAccountSubscription(' + JSON.stringify(value) + ', ' + JSON.stringify(label) + ')\'>' +
+      escapeHtml(label) + ' <span style="color:#999;font-size:12px">(' + it.unusedCount + ')</span></div>'
+    );
+  });
+  menu.innerHTML = items.join('');
+}
+
+// 加载邮箱域名筛选列表
+async function loadAccountEmailDomainFilter() {
+  const r = await api('GET', '/admin/accounts/email-domains');
+  if (r.code !== 0 || !Array.isArray(r.data)) return;
+
+  const menu = document.querySelector('#accountEmailDomainDropdown .k-dropdown-menu');
+  if (!menu) return;
+
+  const items = ['<div class="k-dropdown-item ' + (accountEmailDomainFilter ? '' : 'selected') +
+    '" onclick="selectAccountEmailDomain(\'\', \'全部域名\')">全部域名</div>'];
+  r.data.forEach(function(it) {
+    const value = it.domain || '';
+    if (!value) return;
+    const selected = accountEmailDomainFilter === value ? 'selected' : '';
+    const label = value;
+    items.push(
+      '<div class="k-dropdown-item ' + selected + '" ' +
+      'onclick=\'selectAccountEmailDomain(' + JSON.stringify(value) + ', ' + JSON.stringify(label) + ')\'>' +
       escapeHtml(label) + ' <span style="color:#999;font-size:12px">(' + it.unusedCount + ')</span></div>'
     );
   });
@@ -835,9 +921,26 @@ async function loadAssignedAccounts(page = 1) {
 
     const fmtTime = v => v ? new Date(v).toLocaleString('zh-CN', {hour12:false, month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '-';
 
+    // 邮箱地址（可复制）
+    const emailDisplay = a.Email 
+      ? `<span class="copyable-text" onclick="copyToClipboard('${escapeHtml(a.Email)}')" title="点击复制邮箱">${escapeHtml(a.Email)}</span>`
+      : '-';
+    
+    // 卡密信息（可复制）
+    const cardCodeDisplay = a.CardCode 
+      ? `<div style="font-size:11px;color:#10b981;margin-top:4px">
+           <span class="copyable-text" onclick="copyToClipboard('${escapeHtml(a.CardCode)}')" title="点击复制卡密">
+             卡密: ${escapeHtml(a.CardCode)}
+           </span>
+         </div>` 
+      : '';
+
     return `<tr>
       <td data-label="ID" style="color:#999">${a.ID}</td>
-      <td data-label="邮箱" class="account-email-cell">${a.Email || '-'}</td>
+      <td data-label="邮箱" class="account-email-cell">
+        ${emailDisplay}
+        ${cardCodeDisplay}
+      </td>
       <td data-label="健康状态">${healthBadge(a.Status)}</td>
       <td data-label="订阅" class="account-subscription-cell">${subscriptionBadge(a.Subscription)}</td>
       <td data-label="额度用量" class="account-usage-cell">
