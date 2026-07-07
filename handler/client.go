@@ -225,7 +225,7 @@ func popAccount(excludeID uint, subscription string, allowedEmailDomains string)
 	q = filterAccountEmailDomainsQuery(q, allowedEmailDomains)
 
 	var candidates []model.Account
-	if err := q.Order("created_at ASC, id ASC").Limit(50).Find(&candidates).Error; err != nil {
+	if err := q.Order(database.RandomOrder()).Limit(50).Find(&candidates).Error; err != nil {
 		return nil, err
 	}
 	if len(candidates) == 0 {
@@ -368,7 +368,7 @@ func popMultipleAccounts(n int, subscription string, allowedEmailDomains string)
 	}
 
 	var candidates []model.Account
-	if err := q.Order("created_at ASC, id ASC").Limit(n * 4).Find(&candidates).Error; err != nil {
+	if err := q.Order(database.RandomOrder()).Limit(n * 4).Find(&candidates).Error; err != nil {
 		return nil, err
 	}
 

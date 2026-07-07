@@ -15,13 +15,14 @@ import (
 )
 
 var DB *gorm.DB
+var dbType string
 
 // Init 初始化数据库连接。
 // DB_TYPE 支持 sqlite（默认）和 mysql。
 // SQLite: DB_PATH=app.db（默认）
 // MySQL: DB_DSN=user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 func Init(dsn string) {
-	dbType := os.Getenv("DB_TYPE")
+	dbType = os.Getenv("DB_TYPE")
 	if dbType == "" {
 		dbType = "sqlite"
 	}
@@ -90,6 +91,14 @@ func Init(dsn string) {
 	migrateEncryptedCredentials()
 
 	log.Println("数据库初始化完成")
+}
+
+// RandomOrder 返回适合当前数据库的随机排序语句
+func RandomOrder() string {
+	if dbType == "mysql" {
+		return "RAND()"
+	}
+	return "RANDOM()"
 }
 
 func loadCryptoKeyFromKV() {
