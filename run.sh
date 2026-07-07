@@ -179,8 +179,19 @@ run_dev() {
     # 创建日志目录
     mkdir -p logs
     
-    print_info "开始编译..."
-    go build -o kiroclaim-dev main.go
+    # 删除旧的二进制文件
+    if [ -f kiroclaim-dev ]; then
+        print_debug "删除旧的二进制文件"
+        rm -f kiroclaim-dev
+    fi
+    
+    print_info "重新编译项目..."
+    if go build -o kiroclaim-dev main.go; then
+        print_info "编译成功"
+    else
+        print_error "编译失败"
+        exit 1
+    fi
     
     local port=$(get_port)
     print_info "启动服务（端口: $port）..."

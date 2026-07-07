@@ -170,10 +170,14 @@ build_program() {
         exit 1
     fi
     
-    print_info "开始编译..."
-    go build -o "$INSTALL_DIR/bin/kiroclaim" main.go
+    # 删除旧的二进制文件（如果存在）
+    if [ -f "$INSTALL_DIR/bin/kiroclaim" ]; then
+        print_info "删除旧的二进制文件"
+        rm -f "$INSTALL_DIR/bin/kiroclaim"
+    fi
     
-    if [ $? -eq 0 ]; then
+    print_info "重新编译项目..."
+    if go build -o "$INSTALL_DIR/bin/kiroclaim" main.go; then
         print_info "编译成功"
         chmod +x "$INSTALL_DIR/bin/kiroclaim"
     else
