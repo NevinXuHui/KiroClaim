@@ -399,7 +399,31 @@ func ListAccounts(c *gin.Context) {
 	}
 
 	q.Count(&total)
-	q.Order("id desc").Offset((page - 1) * size).Limit(size).Find(&accounts)
+	
+	// 排序支持
+	sortBy := c.DefaultQuery("sort_by", "id")
+	sortOrder := c.DefaultQuery("sort_order", "desc")
+	
+	// 验证排序字段
+	validSortFields := map[string]string{
+		"id":            "id",
+		"created_at":    "created_at",
+		"credit_usage":  "credit_used",
+		"credit_limit":  "credit_limit",
+		"last_checked":  "last_checked_at",
+	}
+	
+	sortField, ok := validSortFields[sortBy]
+	if !ok {
+		sortField = "id"
+	}
+	
+	// 验证排序方向
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = "desc"
+	}
+	
+	q.Order(sortField + " " + sortOrder).Offset((page - 1) * size).Limit(size).Find(&accounts)
 
 	// 对已兑换账号，查询关联的卡密信息
 	type AccountWithCard struct {

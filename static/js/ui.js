@@ -78,23 +78,115 @@ function renderPagination(containerId, total, size, current, fn) {
   var pages = Math.ceil(total / size);
   var el = document.getElementById(containerId);
   if (!el) return; // 元素不存在则直接返回
-  if (pages <= 1) { el.innerHTML = ''; return; }
+  
+  // 同时渲染顶部和底部分页（如果存在Top容器）
+  var elTop = document.getElementById(containerId + 'Top');
+  
+  if (pages <= 1) { 
+    el.innerHTML = ''; 
+    if (elTop) elTop.innerHTML = '';
+    return; 
+  }
+  
+  // 生成分页HTML的函数
+  function generatePaginationHTML(jumpId, isTop) {
+    var marginStyle = isTop ? 'margin-bottom:16px' : 'margin-top:24px';
+    var html = '<div style="display:flex;align-items:center;justify-content:center;gap:8px;' + marginStyle + ';flex-wrap:wrap">';
+    
+    // 首页按钮（始终显示）
+    if (current > 1) {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="' + fn.name + '(1)" title="第一页">首页</button>';
+    } else {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" disabled style="opacity:0.5;cursor:not-allowed" title="已在第一页">首页</button>';
+    }
+    
+    // 上一页按钮（始终显示）
+    if (current > 1) {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="' + fn.name + '(' + (current - 1) + ')" title="上一页">上一页</button>';
+    } else {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" disabled style="opacity:0.5;cursor:not-allowed" title="已在第一页">上一页</button>';
+    }
+    
+    // 页码显示和快速跳转
+    html += '<div style="display:flex;align-items:center;gap:6px">';
+    
+    // 显示省略页码
+    var showPages = [];
+    if (pages <= 7) {
+      // 总页数少时显示全部
+      for (var i = 1; i <= pages; i++) {
+        showPages.push(i);
+      }
+    } else {
+      // 总页数多时显示部分
+      showPages.push(1);
+      if (current > 3) showPages.push('...');
+      
+      var start = Math.max(2, current - 1);
+      var end = Math.min(pages - 1, current + 1);
+      for (var i = start; i <= end; i++) {
+        showPages.push(i);
+      }
+      
+      if (current < pages - 2) showPages.push('...');
+      showPages.push(pages);
+    }
+    
+    // 渲染页码按钮
+    showPages.forEach(function(p) {
+      if (p === '...') {
+        html += '<span style="color:#999;padding:0 4px">···</span>';
+      } else if (p === current) {
+        html += '<button class="ui-btn ui-btn-primary ui-btn-sm" style="min-width:36px;font-weight:600">' + p + '</button>';
+      } else {
+        html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" style="min-width:36px" onclick="' + fn.name + '(' + p + ')">' + p + '</button>';
+      }
+    });
+    
+    html += '</div>';
+    
+    // 下一页按钮（始终显示）
+    if (current < pages) {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="' + fn.name + '(' + (current + 1) + ')" title="下一页">下一页</button>';
+    } else {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" disabled style="opacity:0.5;cursor:not-allowed" title="已在最后一页">下一页</button>';
+    }
+    
+    // 尾页按钮（始终显示）
+    if (current < pages) {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="' + fn.name + '(' + pages + ')" title="最后一页">尾页</button>';
+    } else {
+      html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" disabled style="opacity:0.5;cursor:not-allowed" title="已在最后一页">尾页</button>';
+    }
+    
+    // 页码信息和跳转
+    html += '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:4px;font-size:13px;color:#999;border-left:1px solid #e5e5e7;padding-left:12px">' +
+      '<span>共 ' + pages + ' 页 / ' + total + ' 条</span>' +
+      '</span>';
+    
+    // 跳转输入
+    html += '<span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#999">' +
+      '跳至' +
+      '<input id="' + jumpId + '" type="number" min="1" max="' + pages + '" value="' + current + '" ' +
+        'style="width:64px;padding:4px 8px;border:1px solid #e5e5e7;border-radius:8px;font-size:13px;text-align:center" ' +
+        'onkeydown="if(event.key===\'Enter\'){__pageJump(\'' + jumpId + '\',' + pages + ',' + fn.name + ')}">' +
+      '页' +
+      '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="__pageJump(\'' + jumpId + '\',' + pages + ',' + fn.name + ')">GO</button>' +
+      '</span>';
+    
+    html += '</div>';
+    return html;
+  }
+  
+  // 底部分页
   var jumpId = containerId + '_jump';
-  var html = '<div style="display:flex;align-items:center;gap:12px;margin-top:24px;flex-wrap:wrap">';
-  if (current > 1) html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="' + fn.name + '(' + (current - 1) + ')">PREV</button>';
-  html += '<span style="font-size:13px;color:#999">PAGE ' + current + ' / ' + pages + '</span>';
-  if (current < pages) html += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="' + fn.name + '(' + (current + 1) + ')">NEXT</button>';
-  // 跳转输入
-  html += '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:13px;color:#999">' +
-    '跳至' +
-    '<input id="' + jumpId + '" type="number" min="1" max="' + pages + '" value="' + current + '" ' +
-      'style="width:64px;padding:4px 8px;border:1px solid #e5e5e7;border-radius:8px;font-size:13px;text-align:center" ' +
-      'onkeydown="if(event.key===\'Enter\'){__pageJump(\'' + jumpId + '\',' + pages + ',' + fn.name + ')}">' +
-    '页' +
-    '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="__pageJump(\'' + jumpId + '\',' + pages + ',' + fn.name + ')">GO</button>' +
-    '</span>';
-  html += '</div>';
-  el.innerHTML = html;
+  el.innerHTML = generatePaginationHTML(jumpId, false);
+  
+  // 顶部分页
+  if (elTop) {
+    var topJumpId = containerId + 'Top_jump';
+    elTop.innerHTML = generatePaginationHTML(topJumpId, true);
+  }
 }
 
 // 跳转页处理

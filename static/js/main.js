@@ -1,5 +1,48 @@
 // 主入口模块
 
+// 初始化页面大小下拉框显示
+function initPageSizeDropdowns() {
+  // 账号页面大小
+  const accountSize = parseInt(localStorage.getItem('accountPageSize') || '15');
+  const accountTexts = {15: '每页 15 条', 30: '每页 30 条', 50: '每页 50 条', 100: '每页 100 条'};
+  const accountSizeText = document.getElementById('accountPageSizeText');
+  if (accountSizeText) {
+    accountSizeText.textContent = accountTexts[accountSize] || '每页 15 条';
+    // 设置下拉菜单项的选中状态
+    document.querySelectorAll('#accountPageSizeDropdown .k-dropdown-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    const accountMenuItem = document.querySelector(`#accountPageSizeDropdown .k-dropdown-item[onclick*="selectAccountPageSize(${accountSize}"]`);
+    if (accountMenuItem) accountMenuItem.classList.add('selected');
+  }
+
+  // 卡密页面大小
+  const cardSize = parseInt(localStorage.getItem('cardPageSize') || '15');
+  const cardTexts = {15: '每页 15 条', 30: '每页 30 条', 50: '每页 50 条', 100: '每页 100 条'};
+  const cardSizeText = document.getElementById('cardPageSizeText');
+  if (cardSizeText) {
+    cardSizeText.textContent = cardTexts[cardSize] || '每页 15 条';
+    document.querySelectorAll('#cardPageSizeDropdown .k-dropdown-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    const cardMenuItem = document.querySelector(`#cardPageSizeDropdown .k-dropdown-item[onclick*="selectCardPageSize(${cardSize}"]`);
+    if (cardMenuItem) cardMenuItem.classList.add('selected');
+  }
+
+  // 日志页面大小
+  const logSize = parseInt(localStorage.getItem('logPageSize') || '20');
+  const logTexts = {20: '每页 20 条', 50: '每页 50 条', 100: '每页 100 条', 200: '每页 200 条'};
+  const logSizeText = document.getElementById('logPageSizeText');
+  if (logSizeText) {
+    logSizeText.textContent = logTexts[logSize] || '每页 20 条';
+    document.querySelectorAll('#logPageSizeDropdown .k-dropdown-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    const logMenuItem = document.querySelector(`#logPageSizeDropdown .k-dropdown-item[onclick*="selectLogPageSize(${logSize}"]`);
+    if (logMenuItem) logMenuItem.classList.add('selected');
+  }
+}
+
 // 侧边栏切换
 function switchTab(name, el) {
   var currentTab = document.querySelector('.tab-panel.active');
@@ -54,6 +97,9 @@ function switchTab(name, el) {
 
 // 初始化后台（登录成功后调用）
 function initApp() {
+  // 初始化页面大小下拉框
+  initPageSizeDropdowns();
+  
   var savedTab = localStorage.getItem('currentTab') || 'dashboard';
   if (typeof loadVersionBadge === 'function') loadVersionBadge(false);
 

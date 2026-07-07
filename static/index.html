@@ -193,8 +193,35 @@
                   <div class="k-dropdown-item" onclick="selectAccountUsed('', '全部')">全部</div>
                 </div>
               </div>
+              <div class="k-dropdown" id="accountSortDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('accountSortDropdown')">
+                  <span id="accountSortText">ID 降序</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectAccountSort('id', 'desc', 'ID 降序')">ID 降序</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('id', 'asc', 'ID 升序')">ID 升序</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('created_at', 'desc', '导入时间 (新→旧)')">导入时间 (新→旧)</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('created_at', 'asc', '导入时间 (旧→新)')">导入时间 (旧→新)</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('credit_usage', 'desc', '额度用量 (高→低)')">额度用量 (高→低)</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('credit_usage', 'asc', '额度用量 (低→高)')">额度用量 (低→高)</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('last_checked', 'desc', '最后检查 (新→旧)')">最后检查 (新→旧)</div>
+                  <div class="k-dropdown-item" onclick="selectAccountSort('last_checked', 'asc', '最后检查 (旧→新)')">最后检查 (旧→新)</div>
+                </div>
+              </div>
+              <div class="k-dropdown" id="accountPageSizeDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('accountPageSizeDropdown')">
+                  <span id="accountPageSizeText">每页 15 条</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectAccountPageSize(15, '每页 15 条')">每页 15 条</div>
+                  <div class="k-dropdown-item" onclick="selectAccountPageSize(30, '每页 30 条')">每页 30 条</div>
+                  <div class="k-dropdown-item" onclick="selectAccountPageSize(50, '每页 50 条')">每页 50 条</div>
+                  <div class="k-dropdown-item" onclick="selectAccountPageSize(100, '每页 100 条')">每页 100 条</div>
+                </div>
+              </div>
               <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="resetAccountFilters()">重置</button>
             </div>
+            <div class="pagination" id="accountsPaginationTop"></div>
             <div class="account-table-scroll">
               <table>
                 <thead>
@@ -299,8 +326,20 @@
                   <div class="k-dropdown-item" onclick="selectCardFilter('active', '使用中')">使用中</div>
                 </div>
               </div>
+              <div class="k-dropdown" id="cardPageSizeDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('cardPageSizeDropdown')">
+                  <span id="cardPageSizeText">每页 15 条</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectCardPageSize(15, '每页 15 条')">每页 15 条</div>
+                  <div class="k-dropdown-item" onclick="selectCardPageSize(30, '每页 30 条')">每页 30 条</div>
+                  <div class="k-dropdown-item" onclick="selectCardPageSize(50, '每页 50 条')">每页 50 条</div>
+                  <div class="k-dropdown-item" onclick="selectCardPageSize(100, '每页 100 条')">每页 100 条</div>
+                </div>
+              </div>
               <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="resetCardFilters()">重置</button>
             </div>
+            <div class="pagination" id="cardsPaginationTop"></div>
             <table>
               <thead>
                 <tr>
@@ -342,7 +381,19 @@
                   <div class="k-dropdown-item" onclick="selectLogAction('export', '导出')">导出</div>
                 </div>
               </div>
+              <div class="k-dropdown" id="logPageSizeDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('logPageSizeDropdown')">
+                  <span id="logPageSizeText">每页 20 条</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectLogPageSize(20, '每页 20 条')">每页 20 条</div>
+                  <div class="k-dropdown-item" onclick="selectLogPageSize(50, '每页 50 条')">每页 50 条</div>
+                  <div class="k-dropdown-item" onclick="selectLogPageSize(100, '每页 100 条')">每页 100 条</div>
+                  <div class="k-dropdown-item" onclick="selectLogPageSize(200, '每页 200 条')">每页 200 条</div>
+                </div>
+              </div>
             </div>
+            <div class="pagination" id="logsPaginationTop"></div>
             <table>
               <thead>
                 <tr>
@@ -593,16 +644,16 @@
   </div>
 
   <!-- 页面脚本 -->
-  <script src="/static/js/ui.js"></script>
-  <script src="/static/js/auth.js?v=1783431637"></script>
-  <script src="/static/js/api.js?v=1783431637"></script>
-  <script src="/static/js/dashboard.js?v=1783431637"></script>
-  <script src="/static/js/accounts.js?v=1783431637"></script>
-  <script src="/static/js/cards.js?v=1783431637"></script>
-  <script src="/static/js/export.js?v=1783431637"></script>
-  <script src="/static/js/logs.js?v=1783431637"></script>
-  <script src="/static/js/settings.js?v=1783431637"></script>
-  <script src="/static/js/version.js?v=1783431637"></script>
-  <script src="/static/js/main.js?v=1783431637"></script>
+  <script src="/static/js/ui.js?v=1783433782"></script>
+  <script src="/static/js/auth.js?v=1783433399"></script>
+  <script src="/static/js/api.js?v=1783433399"></script>
+  <script src="/static/js/dashboard.js?v=1783433399"></script>
+  <script src="/static/js/accounts.js?v=1783433399"></script>
+  <script src="/static/js/cards.js?v=1783433399"></script>
+  <script src="/static/js/export.js?v=1783433399"></script>
+  <script src="/static/js/logs.js?v=1783433399"></script>
+  <script src="/static/js/settings.js?v=1783433399"></script>
+  <script src="/static/js/version.js?v=1783433399"></script>
+  <script src="/static/js/main.js?v=1783433399"></script>
 </body>
 </html>

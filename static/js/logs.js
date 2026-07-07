@@ -18,7 +18,7 @@ var actionLabels = {
 // 加载日志列表
 async function loadLogs(page) {
   if (!page) page = 1;
-  var url = '/admin/oplogs?page=' + page + '&size=20';
+  var url = '/admin/oplogs?page=' + page + '&size=' + logPageSize;
   if (logActionFilter) url += '&action=' + logActionFilter;
 
   var r = await api('GET', url);
@@ -41,7 +41,7 @@ async function loadLogs(page) {
       '<td data-label="时间" style="color:#999;font-size:12px">' + new Date(log.CreatedAt).toLocaleString('zh-CN', {hour12:false}) + '</td>' +
     '</tr>';
   }).join('');
-  renderPagination('logsPagination', r.data.total, 20, page, loadLogs);
+  renderPagination('logsPagination', r.data.total, logPageSize, page, loadLogs);
 }
 
 // 日志类型筛选
@@ -53,5 +53,18 @@ function selectLogAction(value, text) {
   });
   event.target.classList.add('selected');
   toggleDropdown('logActionDropdown');
+  loadLogs(1);
+}
+
+// 选择每页显示数量
+function selectLogPageSize(size, text) {
+  logPageSize = size;
+  localStorage.setItem('logPageSize', size);
+  document.getElementById('logPageSizeText').textContent = text;
+  document.querySelectorAll('#logPageSizeDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+  toggleDropdown('logPageSizeDropdown');
   loadLogs(1);
 }

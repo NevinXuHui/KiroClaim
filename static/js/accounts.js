@@ -7,6 +7,13 @@ let accountEmailDomainFilter = '';
 let accountUsedFilter = 'false'; // 默认只显示未兑换，'false'=未兑换, 'true'=已兑换, ''=全部
 let accountKeyword = '';
 
+// 排序状态
+let accountSortBy = 'id';
+let accountSortOrder = 'desc';
+
+// 每页显示数量（从 localStorage 读取，默认 15）
+let accountPageSize = parseInt(localStorage.getItem('accountPageSize') || '15');
+
 // 批量选择
 let selectedAccountIds = new Set();
 
@@ -14,7 +21,7 @@ async function loadAccounts(page = 1) {
   accountKeyword = (document.getElementById('accountKeyword')?.value || '').trim();
   const createdFrom = document.getElementById('accountCreatedFrom')?.value || '';
   const createdTo = document.getElementById('accountCreatedTo')?.value || '';
-  let url = `/admin/accounts?page=${page}&size=15`;
+  let url = `/admin/accounts?page=${page}&size=${accountPageSize}`;
   if (accountUsedFilter !== '') url += `&used=${accountUsedFilter}`;
   if (accountStatusFilter) url += `&status=${accountStatusFilter}`;
   if (accountSubscriptionFilter) url += `&subscription=${encodeURIComponent(accountSubscriptionFilter)}`;
@@ -22,6 +29,9 @@ async function loadAccounts(page = 1) {
   if (accountKeyword) url += `&keyword=${encodeURIComponent(accountKeyword)}`;
   if (createdFrom) url += `&created_from=${createdFrom}`;
   if (createdTo) url += `&created_to=${createdTo}`;
+  // 添加排序参数
+  if (accountSortBy) url += `&sort_by=${accountSortBy}`;
+  if (accountSortOrder) url += `&sort_order=${accountSortOrder}`;
 
   const r = await api('GET', url);
   const tbody = document.getElementById('accountsBody');
@@ -91,7 +101,7 @@ async function loadAccounts(page = 1) {
       </td>
     </tr>`;
   }).join('');
-  renderPagination('accountsPagination', r.data.total, 15, page, loadAccounts);
+  renderPagination('accountsPagination', r.data.total, accountPageSize, page, loadAccounts);
   updateAccountBatchBtn();
   // 更新全选框状态
   const selectAll = document.getElementById('selectAllAccounts');
@@ -759,6 +769,36 @@ function selectAccountUsed(value, text) {
   loadAccounts(1);
 }
 
+// 选择排序方式
+function selectAccountSort(sortBy, sortOrder, text) {
+  accountSortBy = sortBy;
+  accountSortOrder = sortOrder;
+  document.getElementById('accountSortText').textContent = text;
+
+  document.querySelectorAll('#accountSortDropdown .k-dropdown-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+
+  toggleDropdown('accountSortDropdown');
+  loadAccounts(1);
+}
+
+// 选择每页显示数量
+function selectAccountPageSize(size, text) {
+  accountPageSize = size;
+  localStorage.setItem('accountPageSize', size);
+  document.getElementById('accountPageSizeText').textContent = text;
+
+  document.querySelectorAll('#accountPageSizeDropdown .k-dropdown-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+
+  toggleDropdown('accountPageSizeDropdown');
+  loadAccounts(1);
+}
+
 // 重置账号筛选
 function resetAccountFilters() {
   accountStatusFilter = '';
@@ -766,6 +806,8 @@ function resetAccountFilters() {
   accountEmailDomainFilter = '';
   accountUsedFilter = 'false'; // 重置为默认值：仅未兑换
   accountKeyword = '';
+  accountSortBy = 'id';
+  accountSortOrder = 'desc';
 
   const keywordInput = document.getElementById('accountKeyword');
   if (keywordInput) keywordInput.value = '';
@@ -778,13 +820,15 @@ function resetAccountFilters() {
   document.getElementById('accountSubscriptionText').textContent = '全部订阅';
   document.getElementById('accountEmailDomainText').textContent = '全部域名';
   document.getElementById('accountUsedText').textContent = '仅未兑换';
+  document.getElementById('accountSortText').textContent = 'ID降序';
 
-  document.querySelectorAll('#accountStatusDropdown .k-dropdown-item, #accountSubscriptionDropdown .k-dropdown-item, #accountEmailDomainDropdown .k-dropdown-item, #accountUsedDropdown .k-dropdown-item').forEach(item => {
+  document.querySelectorAll('#accountStatusDropdown .k-dropdown-item, #accountSubscriptionDropdown .k-dropdown-item, #accountEmailDomainDropdown .k-dropdown-item, #accountUsedDropdown .k-dropdown-item, #accountSortDropdown .k-dropdown-item').forEach(item => {
     item.classList.remove('selected');
   });
   document.querySelector('#accountStatusDropdown .k-dropdown-item:first-child')?.classList.add('selected');
   document.querySelector('#accountSubscriptionDropdown .k-dropdown-item:first-child')?.classList.add('selected');
   document.querySelector('#accountEmailDomainDropdown .k-dropdown-item:first-child')?.classList.add('selected');
+  document.querySelector('#accountSortDropdown .k-dropdown-item:first-child')?.classList.add('selected');
 
   loadAccounts(1);
 }
