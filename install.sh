@@ -284,16 +284,56 @@ set_permissions() {
     print_info "权限设置完成"
 }
 
+# 检查并停止占用端口的进程
+check_and_stop_port() {
+    print_step "检查端口占用..."
+
+    # 检查端口是否被占用
+    if command -v lsof &> /dev/null; then
+        PORT_PID=$(lsof -ti :$PORT 2>/dev/null || true)
+        if [ -n "$PORT_PID" ]; then
+            print_warn "端口 $PORT 已被进程 $PORT_PID 占用"
+
+            # 检查是否是旧的 KiroClaim 进程
+            PROCESS_NAME=$(ps -p $PORT_PID -o comm= 2>/dev/null || true)
+            if [[ "$PROCESS_NAME" == *"kiroclaim"* ]] || [[ "$PROCESS_NAME" == *"KiroClaim"* ]]; then
+                print_info "检测到旧的 KiroClaim 进程，正在停止..."
+                kill $PORT_PID 2>/dev/null || true
+                sleep 2
+
+                # 如果进程仍在运行，强制终止
+                if kill -0 $PORT_PID 2>/dev/null; then
+                    print_warn "强制终止进程 $PORT_PID"
+                    kill -9 $PORT_PID 2>/dev/null || true
+                    sleep 1
+                fi
+                print_info "旧进程已停止"
+            else
+                print_error "端口 $PORT 被其他程序 ($PROCESS_NAME) 占用"
+                print_info "请修改配置使用其他端口，或停止占用端口的程序"
+                exit 1
+            fi
+        else
+            print_info "端口 $PORT 可用"
+        fi
+    else
+        print_warn "lsof 命令不可用，跳过端口检查"
+    fi
+}
+
 # 启动服务
 start_service() {
     print_step "启动服务..."
-    
+
+    # 检查并处理端口占用
+    check_and_stop_port
+
     systemctl daemon-reload
     systemctl enable kiroclaim
     systemctl start kiroclaim
-    
+
     sleep 2
-    
+
     if systemctl is-active --quiet kiroclaim; then
         print_info "KiroClaim 服务启动成功！"
         echo ""
