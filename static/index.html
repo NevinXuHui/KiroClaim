@@ -473,13 +473,32 @@
         <span class="modal-close" onclick="closeImportModal()">&times;</span>
       </div>
       <div class="modal-body">
-        <div style="margin-bottom: 20px;">
-          <label style="display:block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">JSON 数据源</label>
-          <textarea class="k-input" id="importJson" placeholder="请输入标准 JSON 格式数据"></textarea>
+        <!-- 导入方式切换 -->
+        <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid #eaeaea">
+          <button class="import-tab-btn active" id="importTabText" onclick="switchImportTab('text')">粘贴文本</button>
+          <button class="import-tab-btn" id="importTabFile" onclick="switchImportTab('file')">上传文件</button>
         </div>
+
+        <!-- 粘贴文本模式 -->
+        <div id="importModeText" style="margin-bottom: 20px;">
+          <label style="display:block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">JSON 数据源</label>
+          <textarea class="k-input" id="importJson" placeholder="请输入标准 JSON 格式数据，支持 JSON 数组或每行一个 JSON 对象"></textarea>
+        </div>
+
+        <!-- 上传文件模式 -->
+        <div id="importModeFile" style="margin-bottom: 20px; display:none;">
+          <label style="display:block; margin-bottom: 8px; font-size: 13px; color: var(--text-muted);">选择文件</label>
+          <input type="file" id="importFileInput" accept=".json,.txt,.jsonl" style="display:none" onchange="handleImportFile(this)">
+          <div style="display:flex; gap:12px; align-items:center">
+            <button class="ui-btn ui-btn-secondary" onclick="document.getElementById('importFileInput').click()">选择文件</button>
+            <span id="importFileName" style="font-size:13px; color:#666">支持 .json, .txt, .jsonl 格式</span>
+          </div>
+          <div id="importFilePreview" style="margin-top:12px; padding:12px; background:#f9f9f9; border:1px solid #eaeaea; border-radius:6px; max-height:200px; overflow-y:auto; display:none; font-size:12px; font-family:monospace; white-space:pre-wrap; word-break:break-all"></div>
+        </div>
+
         <div style="display:flex; gap:12px">
           <button class="ui-btn ui-btn-primary" onclick="doImport(this)">执行导入</button>
-          <button class="ui-btn ui-btn-secondary" onclick="document.getElementById('importJson').value=''">清空</button>
+          <button class="ui-btn ui-btn-secondary" onclick="clearImportData()">清空</button>
           <button class="ui-btn ui-btn-secondary" onclick="closeImportModal()">取消</button>
         </div>
         <div id="importResult" style="margin-top:20px"></div>

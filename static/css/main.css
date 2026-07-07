@@ -1979,6 +1979,28 @@ textarea.k-input::-webkit-scrollbar-corner {
     overflow-y: auto;
 }
 
+/* 导入标签切换按钮 */
+.import-tab-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.import-tab-btn:hover {
+    color: var(--text-main);
+}
+
+.import-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 500;
+}
+
 .account-info-modal .modal-content {
     max-width: 860px;
     border: none;

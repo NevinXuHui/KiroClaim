@@ -85,7 +85,104 @@ docker compose down -v
 
 后台内置版本检测。若要使用后台里的“更新到最新 Docker”和“系统自动更新”，Compose 部署会默认挂载宿主 Docker socket；这等同于授予容器管理宿主 Docker 的权限，请只在可信服务器上开启自动更新。
 
+## 快速启动脚本
+
+项目提供了便捷的脚本工具，简化开发和部署流程。
+
+### run.sh - 开发与运行脚本
+
+快速启动开发环境或生产部署：
+
+```bash
+# 本地开发模式（SQLite，自动处理端口冲突）
+./run.sh dev
+
+# 编译多平台二进制
+./run.sh build
+
+# Docker Compose 生产环境
+./run.sh prod
+
+# 查看服务状态
+./run.sh status
+
+# 停止所有服务
+./run.sh stop
+
+# 查看帮助
+./run.sh help
+```
+
+**主要特性：**
+- ✅ 自动检测并停止旧进程，避免端口冲突
+- ✅ 智能进程管理，区分 KiroClaim 进程和其他程序
+- ✅ 实时状态监控，显示端口占用和容器状态
+- ✅ 支持开发模式和生产模式快速切换
+
+### install.sh - systemd 系统服务安装
+
+使用 systemd 将 KiroClaim 安装为系统服务，适合生产环境长期运行：
+
+```bash
+# 安装为系统服务
+sudo ./install.sh install
+
+# 查看服务状态
+sudo ./install.sh status
+
+# 卸载服务
+sudo ./install.sh uninstall
+```
+
+**安装后的服务管理：**
+
+```bash
+# 启动服务
+sudo systemctl start kiroclaim
+
+# 停止服务
+sudo systemctl stop kiroclaim
+
+# 重启服务
+sudo systemctl restart kiroclaim
+
+# 查看状态
+sudo systemctl status kiroclaim
+
+# 查看日志
+sudo journalctl -u kiroclaim -f
+
+# 开机自启动
+sudo systemctl enable kiroclaim
+```
+
+**systemd 服务特性：**
+- 🔒 安全加固（权限限制、目录保护）
+- 🔄 自动重启（失败后自动恢复）
+- 📊 资源限制（文件描述符、进程数）
+- 📝 集成系统日志
+- ⚡ 优雅停止与重启
+
+**安装目录结构：**
+
+```
+/opt/kiroclaim/
+├── bin/kiroclaim      # 主程序
+├── data/              # 数据目录（SQLite）
+├── logs/              # 日志目录
+├── static/            # 静态资源
+└── .env              # 配置文件
+```
+
 ## 本地开发
+
+### 方式一：使用 run.sh（推荐）
+
+```bash
+./run.sh dev
+```
+
+### 方式二：手动运行
 
 ```bash
 cp .env.example .env

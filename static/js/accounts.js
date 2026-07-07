@@ -337,6 +337,8 @@ function formatUpstreamTime(value) {
 // 模态框控制
 function showImportModal() {
   document.getElementById('importModal').classList.add('active');
+  // 默认显示粘贴文本模式
+  switchImportTab('text');
 
   const taskId = localStorage.getItem('importTaskId');
   const total = localStorage.getItem('importTaskTotal');
@@ -360,6 +362,61 @@ function closeImportModal() {
 
   document.getElementById('importModal').classList.remove('active');
   document.getElementById('importResult').innerHTML = '';
+  clearImportData();
+}
+
+// 切换导入模式
+function switchImportTab(mode) {
+  const textTab = document.getElementById('importTabText');
+  const fileTab = document.getElementById('importTabFile');
+  const textMode = document.getElementById('importModeText');
+  const fileMode = document.getElementById('importModeFile');
+
+  if (mode === 'text') {
+    textTab.classList.add('active');
+    fileTab.classList.remove('active');
+    textMode.style.display = 'block';
+    fileMode.style.display = 'none';
+  } else {
+    textTab.classList.remove('active');
+    fileTab.classList.add('active');
+    textMode.style.display = 'none';
+    fileMode.style.display = 'block';
+  }
+}
+
+// 处理文件上传
+function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const fileNameEl = document.getElementById('importFileName');
+  const previewEl = document.getElementById('importFilePreview');
+  
+  fileNameEl.textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    
+    // 将文件内容存储到 textarea 中
+    document.getElementById('importJson').value = content;
+    
+    // 显示预览
+    const preview = content.length > 500 ? content.substring(0, 500) + '\n\n... (文件过长，仅显示前 500 字符)' : content;
+    previewEl.textContent = preview;
+    previewEl.style.display = 'block';
+  };
+  reader.readAsText(file);
+}
+
+// 清空导入数据
+function clearImportData() {
+  document.getElementById('importJson').value = '';
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('importFileName').textContent = '支持 .json, .txt, .jsonl 格式';
+  document.getElementById('importFilePreview').style.display = 'none';
+  document.getElementById('importFilePreview').textContent = '';
 }
 
 // 导入账号
@@ -367,13 +424,41 @@ async function doImport(btn) {
   const raw = document.getElementById('importJson').value.trim();
   const resultEl = document.getElementById('importResult');
 
+  if (!raw) {
+    resultEl.innerHTML = '<span style="color:red">请输入或上传 JSON 数据</span>';
+    showToast('请输入数据', 'error');
+    return;
+  }
+
   let data;
   try {
+    // 尝试标准 JSON 解析
     data = JSON.parse(raw);
   } catch (e) {
-    resultEl.innerHTML = '<span style="color:red">JSON 格式错误：' + e.message + '</span>';
-    showToast('JSON 格式错误', 'error');
-    return;
+    // 如果标准 JSON 解析失败，尝试 JSONL 格式（每行一个 JSON 对象）
+    try {
+      const lines = raw.split('\n').filter(line => line.trim());
+      data = [];
+      for (const line of lines) {
+        const obj = JSON.parse(line.trim());
+        data.push(obj);
+      }
+      if (data.length === 0) {
+        throw new Error('没有有效的 JSON 数据');
+      }
+    } catch (jsonlError) {
+      resultEl.innerHTML = `<div style="padding:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:13px;color:#991b1b">
+        <div style="font-weight:600;margin-bottom:4px">JSON 格式错误</div>
+        <div>请确保数据格式正确：</div>
+        <ul style="margin:8px 0 0 20px;padding:0">
+          <li>标准 JSON 数组：[{...}, {...}]</li>
+          <li>JSONL 格式：每行一个 JSON 对象</li>
+        </ul>
+        <div style="margin-top:8px;font-size:12px;color:#666">${e.message}</div>
+      </div>`;
+      showToast('JSON 格式错误', 'error');
+      return;
+    }
   }
 
   const total = Array.isArray(data) ? data.length : 1;
@@ -418,13 +503,41 @@ async function pollImportStatus(taskId, total, resultEl, btn) {
       const r = await api('GET', `/admin/accounts/import/status/${taskId}`);
       if (r.code === 0) {
         const d = r.data;
+        const percentage = d.total > 0 ? Math.round((d.processed / d.total) * 100) : 0;
 
-        resultEl.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:12px;background:#fafafa;border:1px solid #eaeaea;border-radius:6px;font-size:13px;color:#666">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;flex-shrink:0">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-          </svg>
-          正在处理：<strong style="color:#171717;margin:0 4px">${d.processed}</strong> / ${d.total}
-          (成功: ${d.imported}, 重复: ${d.skippedDup}, 失败: ${d.skippedBad})
+        resultEl.innerHTML = `<div style="padding:16px;background:#fafafa;border:1px solid #eaeaea;border-radius:8px;font-size:13px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:10px;color:#666">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;flex-shrink:0">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
+              <span>正在导入账号...</span>
+            </div>
+            <div style="font-size:18px;font-weight:600;color:#171717;font-variant-numeric:tabular-nums">${percentage}%</div>
+          </div>
+          
+          <div style="background:#e5e7eb;border-radius:9999px;height:8px;overflow:hidden;margin-bottom:12px">
+            <div style="background:linear-gradient(90deg, #3b82f6, #8b5cf6);height:100%;border-radius:9999px;transition:width 0.3s ease;width:${percentage}%"></div>
+          </div>
+          
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff;border-radius:6px">
+              <span style="color:#6b7280">已处理</span>
+              <strong style="color:#171717">${d.processed} / ${d.total}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff;border-radius:6px">
+              <span style="color:#10b981">成功</span>
+              <strong style="color:#10b981">${d.imported}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff;border-radius:6px">
+              <span style="color:#f59e0b">重复</span>
+              <strong style="color:#f59e0b">${d.skippedDup}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff;border-radius:6px">
+              <span style="color:#ef4444">失败</span>
+              <strong style="color:#ef4444">${d.skippedBad}</strong>
+            </div>
+          </div>
         </div>`;
 
         if (d.status === 'completed') {
