@@ -601,8 +601,8 @@ async function showCardLogs(cardId, code) {
 }
 
 function renderCardLogsTable(logs) {
-  var content = '<table class="card-log-table"><thead><tr><th>操作</th><th>账号邮箱</th><th>健康状态</th><th>额度用量</th><th>客户端 IP</th><th>时间</th><th>操作</th></tr></thead><tbody>';
-  logs.forEach(function(log) {
+  var content = '<table class="card-log-table"><thead><tr><th style="width:50px">#</th><th>操作</th><th>账号邮箱</th><th>健康状态</th><th>额度用量</th><th>客户端 IP</th><th>时间</th><th>操作</th></tr></thead><tbody>';
+  logs.forEach(function(log, index) {
     var actionLabel = log.Action === 'activate' ? '激活' : log.Action;
     var timeStr = new Date(log.CreatedAt).toLocaleString('zh-CN', {hour12: false});
     var statusBadge = log.AccountStatus ? healthBadge(log.AccountStatus) : '<span style="color:#999;font-size:12px">-</span>';
@@ -635,6 +635,7 @@ function renderCardLogsTable(logs) {
     var refreshTitle = isSuspended ? '封禁账号不允许刷新' : '';
     
     content += '<tr data-credit-value="' + creditValue + '" data-status="' + (log.AccountStatus || '') + '">';
+    content += '<td data-label="#" style="color:var(--text-muted);font-size:12px">' + (index + 1) + '</td>';
     content += '<td data-label="操作" class="card-log-action" style="font-size:13px">' + escapeHtml(actionLabel) + '</td>';
     content += '<td data-label="账号邮箱" class="card-log-email" style="font-size:12px;font-family:monospace">' + emailDisplay + '</td>';
     content += '<td data-label="健康状态" class="card-log-status">' + statusBadge + '</td>';
