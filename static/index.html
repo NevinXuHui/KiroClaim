@@ -354,20 +354,22 @@
               <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="resetCardFilters()">重置</button>
             </div>
             <div class="pagination" id="cardsPaginationTop"></div>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:40px"><input type="checkbox" class="k-checkbox" id="selectAllCards" onchange="toggleSelectAllCards(this.checked)"></th>
-                  <th>ID</th>
-                  <th>序列号</th>
-                  <th>账号订阅</th>
-                  <th>状态</th>
-                  <th>兑换时间</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="cardsBody"></tbody>
-            </table>
+            <div class="account-table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:40px"><input type="checkbox" class="k-checkbox" id="selectAllCards" onchange="toggleSelectAllCards(this.checked)"></th>
+                    <th>ID</th>
+                    <th>序列号</th>
+                    <th>账号订阅</th>
+                    <th>状态</th>
+                    <th>兑换时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="cardsBody"></tbody>
+              </table>
+            </div>
             <div class="pagination" id="cardsPagination"></div>
           </div>
         </div>
@@ -408,19 +410,21 @@
               </div>
             </div>
             <div class="pagination" id="logsPaginationTop"></div>
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>操作类型</th>
-                  <th>详情</th>
-                  <th>操作者</th>
-                  <th>客户端 IP</th>
-                  <th>时间</th>
-                </tr>
-              </thead>
-              <tbody id="logsBody"></tbody>
-            </table>
+            <div class="account-table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>操作类型</th>
+                    <th>详情</th>
+                    <th>操作者</th>
+                    <th>客户端 IP</th>
+                    <th>时间</th>
+                  </tr>
+                </thead>
+                <tbody id="logsBody"></tbody>
+              </table>
+            </div>
             <div class="pagination" id="logsPagination"></div>
           </div>
         </div>
