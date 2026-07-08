@@ -97,6 +97,7 @@ func ListCards(c *gin.Context) {
 	keyword := c.Query("keyword")
 	createdFrom := c.Query("created_from")
 	createdTo := c.Query("created_to")
+	accountCountFilter := c.Query("account_count")
 	if page < 1 {
 		page = 1
 	}
@@ -133,6 +134,11 @@ func ListCards(c *gin.Context) {
 	if createdTo != "" {
 		if t, err := time.Parse("2006-01-02", createdTo); err == nil {
 			q = q.Where("created_at < ?", t.AddDate(0, 0, 1))
+		}
+	}
+	if accountCountFilter != "" {
+		if count, err := strconv.Atoi(accountCountFilter); err == nil && count > 0 {
+			q = q.Where("account_count = ?", count)
 		}
 	}
 

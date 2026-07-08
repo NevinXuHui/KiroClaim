@@ -2,6 +2,7 @@
 
 let cardStatusFilter = '';
 let cardKeyword = '';
+let cardAccountCountFilter = ''; // 账号数量筛选
 let genSubscription = '';
 let genEmailDomains = []; // 存储选中的邮箱域名
 
@@ -101,6 +102,7 @@ async function loadCards(page = 1) {
   if (cardKeyword) url += `&keyword=${encodeURIComponent(cardKeyword)}`;
   if (createdFrom) url += `&created_from=${createdFrom}`;
   if (createdTo) url += `&created_to=${createdTo}`;
+  if (cardAccountCountFilter) url += `&account_count=${cardAccountCountFilter}`;
 
   const r = await api('GET', url);
   const tbody = document.getElementById('cardsBody');
@@ -157,6 +159,17 @@ function selectCardFilter(value, text) {
   });
   event.target.classList.add('selected');
   toggleDropdown('cardFilterDropdown');
+  loadCards(1);
+}
+
+function selectCardAccountCount(value, text) {
+  cardAccountCountFilter = value;
+  document.getElementById('cardAccountCountText').textContent = text;
+  document.querySelectorAll('#cardAccountCountDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+  toggleDropdown('cardAccountCountDropdown');
   loadCards(1);
 }
 
@@ -413,6 +426,7 @@ async function deleteCard(id) {
 function resetCardFilters() {
   cardStatusFilter = '';
   cardKeyword = '';
+  cardAccountCountFilter = '';
 
   var keywordInput = document.getElementById('cardKeyword');
   if (keywordInput) keywordInput.value = '';
@@ -426,6 +440,13 @@ function resetCardFilters() {
     item.classList.remove('selected');
   });
   document.querySelector('#cardFilterDropdown .k-dropdown-item:first-child')?.classList.add('selected');
+  
+  document.getElementById('cardAccountCountText').textContent = '全部数量';
+  document.querySelectorAll('#cardAccountCountDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+  });
+  document.querySelector('#cardAccountCountDropdown .k-dropdown-item:first-child')?.classList.add('selected');
+  
   loadCards(1);
 }
 

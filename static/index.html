@@ -327,6 +327,19 @@
                   <div class="k-dropdown-item" onclick="selectCardFilter('active', '使用中')">使用中</div>
                 </div>
               </div>
+              <div class="k-dropdown" id="cardAccountCountDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('cardAccountCountDropdown')">
+                  <span id="cardAccountCountText">全部数量</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectCardAccountCount('', '全部数量')">全部数量</div>
+                  <div class="k-dropdown-item" onclick="selectCardAccountCount('1', '单账号')">单账号</div>
+                  <div class="k-dropdown-item" onclick="selectCardAccountCount('2', '2个账号')">2个账号</div>
+                  <div class="k-dropdown-item" onclick="selectCardAccountCount('3', '3个账号')">3个账号</div>
+                  <div class="k-dropdown-item" onclick="selectCardAccountCount('4', '4个账号')">4个账号</div>
+                  <div class="k-dropdown-item" onclick="selectCardAccountCount('5', '5个账号')">5个账号</div>
+                </div>
+              </div>
               <div class="k-dropdown" id="cardPageSizeDropdown">
                 <div class="k-dropdown-trigger" onclick="toggleDropdown('cardPageSizeDropdown')">
                   <span id="cardPageSizeText">每页 15 条</span>
