@@ -509,6 +509,36 @@ async function showCardLogs(cardId, code) {
   var overlay = document.createElement('div');
   overlay.id = 'cardLogModal';
   overlay.className = 'modal-overlay active card-log-modal';
+  
+  // 计算状态统计
+  var stats = {
+    active: 0,
+    suspended: 0,
+    unknown: 0,
+    totalCredit: 0,
+    totalLimit: 0
+  };
+  
+  var accountMap = new Map(); // 去重账号统计
+  logs.forEach(function(log) {
+    if (log.AccountID > 0) {
+      accountMap.set(log.AccountID, {
+        status: log.AccountStatus,
+        creditUsed: Number(log.AccountCreditUsed) || 0,
+        creditLimit: Number(log.AccountCreditLimit) || 0
+      });
+    }
+  });
+  
+  accountMap.forEach(function(acc) {
+    if (acc.status === 'active') stats.active++;
+    else if (acc.status === 'suspended') stats.suspended++;
+    else stats.unknown++;
+    stats.totalCredit += acc.creditUsed;
+    stats.totalLimit += acc.creditLimit;
+  });
+  
+  var avgUsage = stats.totalLimit > 0 ? Math.round(stats.totalCredit / stats.totalLimit * 100) : 0;
 
   var content = '<div class="modal-content card-log-content">';
   content += '<div class="modal-header"><span class="modal-title">卡密使用记录 - ' + escapeHtml(code) + '</span>';
@@ -518,70 +548,152 @@ async function showCardLogs(cardId, code) {
   if (!logs.length) {
     content += '<div style="text-align:center;color:#999;padding:40px;font-size:13px">暂无使用记录</div>';
   } else {
+    // 状态统计卡片
+    content += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">';
+    content += '<div style="background:#f0f9ff;border:1px solid #bae6fd;padding:12px;border-radius:6px">';
+    content += '<div style="font-size:11px;color:#0369a1;margin-bottom:4px">活跃账号</div>';
+    content += '<div style="font-size:20px;font-weight:600;color:#0284c7">' + stats.active + '</div>';
+    content += '</div>';
+    content += '<div style="background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:6px">';
+    content += '<div style="font-size:11px;color:#b91c1c;margin-bottom:4px">封禁账号</div>';
+    content += '<div style="font-size:20px;font-weight:600;color:#dc2626">' + stats.suspended + '</div>';
+    content += '</div>';
+    content += '<div style="background:#fefce8;border:1px solid #fef08a;padding:12px;border-radius:6px">';
+    content += '<div style="font-size:11px;color:#a16207;margin-bottom:4px">平均用量</div>';
+    content += '<div style="font-size:20px;font-weight:600;color:#ca8a04">' + avgUsage + '%</div>';
+    content += '</div>';
+    content += '<div style="background:#f3f4f6;border:1px solid #d1d5db;padding:12px;border-radius:6px">';
+    content += '<div style="font-size:11px;color:#6b7280;margin-bottom:4px">总账号数</div>';
+    content += '<div style="font-size:20px;font-weight:600;color:#374151">' + accountMap.size + '</div>';
+    content += '</div>';
+    content += '</div>';
+    
     // 提取所有可刷新的账号ID（去重，排除封禁账号）
     var refreshableAccountIds = [...new Set(
       logs.filter(log => log.AccountID > 0 && log.AccountStatus !== 'suspended')
         .map(log => log.AccountID)
     )];
     
-    // 如果有可刷新的账号，显示全部刷新按钮
+    // 工具栏
+    content += '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+    content += '<div style="display:flex;gap:8px;align-items:center">';
+    content += '<span style="color:var(--text-muted);font-size:13px">共 ' + logs.length + ' 条记录</span>';
+    content += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="sortCardLogs(\'credit\', \'desc\')">额度↓</button>';
+    content += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="sortCardLogs(\'credit\', \'asc\')">额度↑</button>';
+    content += '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="sortCardLogs(\'status\', \'\')">状态</button>';
+    content += '</div>';
     if (refreshableAccountIds.length > 0) {
-      content += '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
-      content += '<span style="color:var(--text-muted);font-size:13px">共 ' + logs.length + ' 条记录，' + refreshableAccountIds.length + ' 个可刷新账号</span>';
       content += '<button class="ui-btn ui-btn-primary ui-btn-sm" id="batchRefreshCardAccounts" ' +
         'onclick="batchRefreshCardAccounts(' + cardId + ', \'' + escapeAttr(code) + '\')">全部刷新</button>';
-      content += '</div>';
     }
+    content += '</div>';
     
-    content += '<table class="card-log-table"><thead><tr><th>操作</th><th>账号邮箱</th><th>健康状态</th><th>额度用量</th><th>客户端 IP</th><th>时间</th><th>操作</th></tr></thead><tbody>';
-    logs.forEach(function(log) {
-      var actionLabel = log.Action === 'activate' ? '激活' : log.Action;
-      var timeStr = new Date(log.CreatedAt).toLocaleString('zh-CN', {hour12: false});
-      var statusBadge = log.AccountStatus ? healthBadge(log.AccountStatus) : '<span style="color:#999;font-size:12px">-</span>';
-      
-      // 额度显示
-      var creditDisplay = '-';
-      if (log.AccountCreditLimit > 0) {
-        var creditUsed = Math.max(0, Number(log.AccountCreditUsed) || 0);
-        var creditLimit = Math.max(0, Number(log.AccountCreditLimit) || 0);
-        var creditPct = Math.min(100, Math.round(creditUsed / creditLimit * 100));
-        var creditColor = creditPct >= 90 ? '#dc2626' : creditPct >= 70 ? '#f59e0b' : 'var(--text-muted)';
-        creditDisplay = '<div style="font-size:12px;color:var(--text-muted)">' +
-          creditUsed.toFixed(1) + ' / ' + creditLimit.toFixed(0) +
-          ' <span style="color:' + creditColor + '">(' + creditPct + '%)</span>' +
-          '</div>';
-      }
-      
-      // 账号邮箱（可点击查看详情）
-      var emailDisplay = log.AccountID 
-        ? '<span class="copyable-text" onclick="showAccountDetail(' + log.AccountID + ')" title="点击查看账号详情">' + 
-          escapeHtml(log.Email || ('ID:' + log.AccountID)) + 
-          '</span>'
-        : escapeHtml(log.Email || '-');
-      
-      // 封禁账号禁用刷新按钮
-      var isSuspended = log.AccountStatus === 'suspended';
-      var refreshDisabled = !log.AccountID || isSuspended;
-      var refreshTitle = isSuspended ? '封禁账号不允许刷新' : '';
-      
-      content += '<tr>';
-      content += '<td data-label="操作" class="card-log-action" style="font-size:13px">' + escapeHtml(actionLabel) + '</td>';
-      content += '<td data-label="账号邮箱" class="card-log-email" style="font-size:12px;font-family:monospace">' + emailDisplay + '</td>';
-      content += '<td data-label="健康状态" class="card-log-status">' + statusBadge + '</td>';
-      content += '<td data-label="额度用量" class="card-log-credit">' + creditDisplay + '</td>';
-      content += '<td data-label="客户端 IP" class="card-log-ip" style="font-size:12px;color:#999">' + escapeHtml(log.ClientIP || '-') + '</td>';
-      content += '<td data-label="时间" class="card-log-time" style="font-size:12px;color:#999;white-space:nowrap">' + escapeHtml(timeStr) + '</td>';
-      content += '<td data-label="操作" class="card-log-actions">' +
-        '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccountInCardLog(' + log.AccountID + ', this)" ' +
-        (refreshDisabled ? 'disabled' : '') + (refreshTitle ? ' title="' + refreshTitle + '"' : '') + '>刷新</button>' +
-        '</td>';
-      content += '</tr>';
-    });
-    content += '</tbody></table>';
+    // 存储原始日志数据供排序使用
+    window.cardLogsData = { cardId: cardId, code: code, logs: logs };
+    
+    content += '<div id="cardLogsTableContainer">';
+    content += renderCardLogsTable(logs);
+    content += '</div>';
   }
   content += '</div></div>';
   overlay.innerHTML = content;
   document.body.appendChild(overlay);
+}
+
+function renderCardLogsTable(logs) {
+  var content = '<table class="card-log-table"><thead><tr><th>操作</th><th>账号邮箱</th><th>健康状态</th><th>额度用量</th><th>客户端 IP</th><th>时间</th><th>操作</th></tr></thead><tbody>';
+  logs.forEach(function(log) {
+    var actionLabel = log.Action === 'activate' ? '激活' : log.Action;
+    var timeStr = new Date(log.CreatedAt).toLocaleString('zh-CN', {hour12: false});
+    var statusBadge = log.AccountStatus ? healthBadge(log.AccountStatus) : '<span style="color:#999;font-size:12px">-</span>';
+    
+    // 额度显示
+    var creditDisplay = '-';
+    var creditValue = 0;
+    if (log.AccountCreditLimit > 0) {
+      var creditUsed = Math.max(0, Number(log.AccountCreditUsed) || 0);
+      var creditLimit = Math.max(0, Number(log.AccountCreditLimit) || 0);
+      var creditPct = Math.min(100, Math.round(creditUsed / creditLimit * 100));
+      creditValue = creditPct;
+      var creditColor = creditPct >= 90 ? '#dc2626' : creditPct >= 70 ? '#f59e0b' : 'var(--text-muted)';
+      creditDisplay = '<div style="font-size:12px;color:var(--text-muted)">' +
+        creditUsed.toFixed(1) + ' / ' + creditLimit.toFixed(0) +
+        ' <span style="color:' + creditColor + '">(' + creditPct + '%)</span>' +
+        '</div>';
+    }
+    
+    // 账号邮箱（可点击查看详情）
+    var emailDisplay = log.AccountID 
+      ? '<span class="copyable-text" onclick="showAccountDetail(' + log.AccountID + ')" title="点击查看账号详情">' + 
+        escapeHtml(log.Email || ('ID:' + log.AccountID)) + 
+        '</span>'
+      : escapeHtml(log.Email || '-');
+    
+    // 封禁账号禁用刷新按钮
+    var isSuspended = log.AccountStatus === 'suspended';
+    var refreshDisabled = !log.AccountID || isSuspended;
+    var refreshTitle = isSuspended ? '封禁账号不允许刷新' : '';
+    
+    content += '<tr data-credit-value="' + creditValue + '" data-status="' + (log.AccountStatus || '') + '">';
+    content += '<td data-label="操作" class="card-log-action" style="font-size:13px">' + escapeHtml(actionLabel) + '</td>';
+    content += '<td data-label="账号邮箱" class="card-log-email" style="font-size:12px;font-family:monospace">' + emailDisplay + '</td>';
+    content += '<td data-label="健康状态" class="card-log-status">' + statusBadge + '</td>';
+    content += '<td data-label="额度用量" class="card-log-credit">' + creditDisplay + '</td>';
+    content += '<td data-label="客户端 IP" class="card-log-ip" style="font-size:12px;color:#999">' + escapeHtml(log.ClientIP || '-') + '</td>';
+    content += '<td data-label="时间" class="card-log-time" style="font-size:12px;color:#999;white-space:nowrap">' + escapeHtml(timeStr) + '</td>';
+    content += '<td data-label="操作" class="card-log-actions">' +
+      '<button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="refreshAccountInCardLog(' + log.AccountID + ', this)" ' +
+      (refreshDisabled ? 'disabled' : '') + (refreshTitle ? ' title="' + refreshTitle + '"' : '') + '>刷新</button>' +
+      '</td>';
+    content += '</tr>';
+  });
+  content += '</tbody></table>';
+  return content;
+}
+
+function sortCardLogs(sortBy, order) {
+  console.log('sortCardLogs called with:', sortBy, order);
+  
+  if (!window.cardLogsData) {
+    console.error('window.cardLogsData is not defined');
+    return;
+  }
+  
+  var logs = [...window.cardLogsData.logs];
+  console.log('Sorting', logs.length, 'logs by', sortBy);
+  
+  if (sortBy === 'credit') {
+    logs.sort(function(a, b) {
+      var aValue = Number(a.AccountCreditUsed) || 0;
+      var bValue = Number(b.AccountCreditUsed) || 0;
+      return order === 'asc' ? aValue - bValue : bValue - aValue;
+    });
+  } else if (sortBy === 'status') {
+    // 切换排序方向：如果当前是正常在前，下次点击就封号在前
+    if (!window.cardLogsData.statusSortReversed) {
+      // 正常在前
+      var statusOrder = { 'active': 0, 'suspended': 1, '': 2 };
+      window.cardLogsData.statusSortReversed = true;
+    } else {
+      // 封号在前
+      var statusOrder = { 'suspended': 0, 'active': 1, '': 2 };
+      window.cardLogsData.statusSortReversed = false;
+    }
+    logs.sort(function(a, b) {
+      var aOrder = statusOrder[a.AccountStatus || ''] || 2;
+      var bOrder = statusOrder[b.AccountStatus || ''] || 2;
+      return aOrder - bOrder;
+    });
+  }
+  
+  var container = document.getElementById('cardLogsTableContainer');
+  if (container) {
+    console.log('Updating table with sorted logs');
+    container.innerHTML = renderCardLogsTable(logs);
+    showToast('排序完成', 'success');
+  } else {
+    console.error('cardLogsTableContainer not found');
+  }
 }
 
 // 在卡密详情中刷新账号
