@@ -5,6 +5,8 @@ let cardKeyword = '';
 let cardAccountCountFilter = ''; // 账号数量筛选
 let genSubscription = '';
 let genEmailDomains = []; // 存储选中的邮箱域名
+let cardSortBy = 'id'; // 排序字段
+let cardSortOrder = 'desc'; // 排序方向
 
 // 每页显示数量（从 localStorage 读取，默认 15）
 let cardPageSize = parseInt(localStorage.getItem('cardPageSize') || '15');
@@ -103,6 +105,8 @@ async function loadCards(page = 1) {
   if (createdFrom) url += `&created_from=${createdFrom}`;
   if (createdTo) url += `&created_to=${createdTo}`;
   if (cardAccountCountFilter) url += `&account_count=${cardAccountCountFilter}`;
+  if (cardSortBy) url += `&sort_by=${cardSortBy}`;
+  if (cardSortOrder) url += `&order=${cardSortOrder}`;
 
   const r = await api('GET', url);
   const tbody = document.getElementById('cardsBody');
@@ -183,6 +187,19 @@ function selectCardPageSize(size, text) {
   });
   event.target.classList.add('selected');
   toggleDropdown('cardPageSizeDropdown');
+  loadCards(1);
+}
+
+// 选择排序方式
+function selectCardSort(sortBy, order, text) {
+  cardSortBy = sortBy;
+  cardSortOrder = order;
+  document.getElementById('cardSortText').textContent = text;
+  document.querySelectorAll('#cardSortDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+  toggleDropdown('cardSortDropdown');
   loadCards(1);
 }
 

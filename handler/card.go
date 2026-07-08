@@ -98,6 +98,8 @@ func ListCards(c *gin.Context) {
 	createdFrom := c.Query("created_from")
 	createdTo := c.Query("created_to")
 	accountCountFilter := c.Query("account_count")
+	sortBy := c.DefaultQuery("sort_by", "id")
+	order := c.DefaultQuery("order", "desc")
 	if page < 1 {
 		page = 1
 	}
@@ -143,7 +145,26 @@ func ListCards(c *gin.Context) {
 	}
 
 	q.Count(&total)
-	q.Order("id desc").Offset((page - 1) * size).Limit(size).Find(&cards)
+	
+	// 构建排序条件
+	var orderClause string
+	switch sortBy {
+	case "id":
+		orderClause = "id"
+	case "created_at":
+		orderClause = "created_at"
+	case "used_at":
+		orderClause = "used_at"
+	default:
+		orderClause = "id"
+	}
+	if order == "asc" {
+		orderClause += " asc"
+	} else {
+		orderClause += " desc"
+	}
+	
+	q.Order(orderClause).Offset((page - 1) * size).Limit(size).Find(&cards)
 
 	list := make([]cardListItem, 0, len(cards))
 	for _, card := range cards {

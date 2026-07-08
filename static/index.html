@@ -351,6 +351,19 @@
                   <div class="k-dropdown-item" onclick="selectCardPageSize(100, '每页 100 条')">每页 100 条</div>
                 </div>
               </div>
+              <div class="k-dropdown" id="cardSortDropdown">
+                <div class="k-dropdown-trigger" onclick="toggleDropdown('cardSortDropdown')">
+                  <span id="cardSortText">ID 降序</span>
+                </div>
+                <div class="k-dropdown-menu">
+                  <div class="k-dropdown-item selected" onclick="selectCardSort('id', 'desc', 'ID 降序')">ID 降序</div>
+                  <div class="k-dropdown-item" onclick="selectCardSort('id', 'asc', 'ID 升序')">ID 升序</div>
+                  <div class="k-dropdown-item" onclick="selectCardSort('created_at', 'desc', '创建时间 (新→旧)')">创建时间 (新→旧)</div>
+                  <div class="k-dropdown-item" onclick="selectCardSort('created_at', 'asc', '创建时间 (旧→新)')">创建时间 (旧→新)</div>
+                  <div class="k-dropdown-item" onclick="selectCardSort('used_at', 'desc', '兑换时间 (新→旧)')">兑换时间 (新→旧)</div>
+                  <div class="k-dropdown-item" onclick="selectCardSort('used_at', 'asc', '兑换时间 (旧→新)')">兑换时间 (旧→新)</div>
+                </div>
+              </div>
               <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="resetCardFilters()">重置</button>
             </div>
             <div class="pagination" id="cardsPaginationTop"></div>
@@ -679,7 +692,7 @@
   <script src="/static/js/api.js?v=1783433399"></script>
   <script src="/static/js/dashboard.js?v=1783433399"></script>
   <script src="/static/js/accounts.js?v=1783437764"></script>
-  <script src="/static/js/cards.js?v=1783514000"></script>
+  <script src="/static/js/cards.js?v=1783514100"></script>
   <script src="/static/js/export.js?v=1783433399"></script>
   <script src="/static/js/logs.js?v=1783436439"></script>
   <script src="/static/js/settings.js?v=1783465723"></script>
