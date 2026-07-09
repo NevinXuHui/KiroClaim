@@ -574,7 +574,7 @@
       const isComplete = _streamDone && readyCount === expectedCount && readyCount > 0;
       const actionsDisabled = (readyCount === 0 || !isComplete) ? ' disabled' : '';
       const disabledClass = (readyCount === 0 || !isComplete) ? ' disabled' : '';
-      const actionHint = (!isComplete && readyCount > 0) ? '<div class="action-hint">⚠️ 请等待所有账号提取完成后再进行操作</div>' : '';
+      const actionHint = (!isComplete && readyCount > 0) ? '<div class="action-hint">🚫 账号提取中，请稍候... (' + readyCount + '/' + expectedCount + ')</div>' : '';
 
       box.innerHTML =
         '<div class="status ' + statusClass + '"><span class="status-dot"></span>' + esc(statusText) + '</div>' +
