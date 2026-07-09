@@ -1145,3 +1145,42 @@
         font-size: 16px !important;
       }
     }
+
+    /* 操作提示样式 */
+    .action-hint {
+      margin: 16px 0 12px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #fff3cd 0%, #fff8e1 100%);
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      color: #856404;
+      font-size: 13px;
+      line-height: 1.6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: hint-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes hint-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+
+    /* 禁用按钮样式 */
+    .btn-row .copy-btn.disabled,
+    .btn-row .download-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+      background: #e9ecef;
+      color: #6c757d;
+      border-color: #dee2e6;
+    }
+
+    .btn-row .copy-btn.disabled:hover,
+    .btn-row .download-btn.disabled:hover {
+      background: #e9ecef;
+      transform: none;
+      box-shadow: none;
+    }

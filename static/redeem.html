@@ -331,18 +331,6 @@
       return [];
     }
 
-    function paintGet(box) {
-      const accounts = normalizeAccounts(_lastGetData);
-      box.innerHTML =
-        '<div class="status ok"><span class="status-dot"></span>成功提取账号凭证</div>' +
-        '<div class="result-title">账号凭证</div>' +
-        '<div class="account-list">' + accounts.map(renderAccountCard).join('') + '</div>' +
-        '<div class="btn-row">' +
-          '<button class="copy-btn" onclick="copyGetResult(this)">复制完整 JSON</button>' +
-          '<button class="download-btn" onclick="downloadGetResult(this)">下载 JSON</button>' +
-        '</div>';
-    }
-
     function renderAccountCard(account, index) {
       const title = account.email || account.Email || ('账号 #' + (index + 1));
       const provider = account.provider || account.Provider || '-';
@@ -427,18 +415,6 @@
       btn.textContent = '已下载';
       btn.classList.add('done');
       setTimeout(function() { btn.textContent = '下载 JSON'; btn.classList.remove('done'); }, 2000);
-    }
-
-    function paintGet(box) {
-      const accounts = normalizeAccounts(_lastGetData);
-      box.innerHTML =
-        '<div class="status ok"><span class="status-dot"></span>成功提取账号</div>' +
-        '<div class="result-title">账号信息</div>' +
-        '<div class="account-list">' + accounts.map(renderAccountCard).join('') + '</div>' +
-        '<div class="btn-row">' +
-          '<button class="copy-btn" onclick="copyGetResult(this)">复制全部</button>' +
-          '<button class="download-btn" onclick="downloadGetResult(this)">下载 JSON</button>' +
-        '</div>';
     }
 
     function renderAccountCard(account, index) {
@@ -595,7 +571,10 @@
         : streaming
           ? (_streamMessage || ('正在提取账号 ' + readyCount + ' / ' + expectedCount))
           : '成功提取账号';
-      const actionsDisabled = readyCount === 0 ? ' disabled' : '';
+      const isComplete = _streamDone && readyCount === expectedCount && readyCount > 0;
+      const actionsDisabled = (readyCount === 0 || !isComplete) ? ' disabled' : '';
+      const disabledClass = (readyCount === 0 || !isComplete) ? ' disabled' : '';
+      const actionHint = (!isComplete && readyCount > 0) ? '<div class="action-hint">⚠️ 请等待所有账号提取完成后再进行操作</div>' : '';
 
       box.innerHTML =
         '<div class="status ' + statusClass + '"><span class="status-dot"></span>' + esc(statusText) + '</div>' +
@@ -604,9 +583,10 @@
           return renderAccountCard(account, start + idx);
         }).join('') + '</div></div>' +
         renderAccountPager(Math.max(expectedCount, readyCount), totalPages) +
+        actionHint +
         '<div class="btn-row">' +
-          '<button class="copy-btn" onclick="copyGetResult(this)"' + actionsDisabled + '>复制全部</button>' +
-          '<button class="download-btn" onclick="downloadGetResult(this)"' + actionsDisabled + '>下载 JSON</button>' +
+          '<button class="copy-btn' + disabledClass + '" onclick="copyGetResult(this)"' + actionsDisabled + '>复制全部</button>' +
+          '<button class="download-btn' + disabledClass + '" onclick="downloadGetResult(this)"' + actionsDisabled + '>下载 JSON</button>' +
         '</div>';
       restoreAccountScrollState(box, scrollState);
       if (scrollState && typeof requestAnimationFrame === 'function') {
