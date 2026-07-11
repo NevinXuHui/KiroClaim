@@ -24,10 +24,12 @@ type cardListItem struct {
 	Subscription        string
 	Status              string
 	AllowedEmailDomains string
+	AvgUsage            int `json:"AvgUsage"`
+	SuspendedCount      int `json:"SuspendedCount"`
 }
 
 func buildCardListItem(card model.Card) cardListItem {
-	return cardListItem{
+	item := cardListItem{
 		ID:                  card.ID,
 		CreatedAt:           card.CreatedAt,
 		UpdatedAt:           card.UpdatedAt,
@@ -38,6 +40,15 @@ func buildCardListItem(card model.Card) cardListItem {
 		Status:              cardStatusFromUsedAt(card.UsedAt),
 		AllowedEmailDomains: card.AllowedEmailDomains,
 	}
+
+	// 如果是使用中的卡密，计算平均用量和封号数
+	if card.UsedAt != nil {
+		avgUsage, suspendedCount := calculateCardStats(card.ID)
+		item.AvgUsage = avgUsage
+		item.SuspendedCount = suspendedCount
+	}
+
+	return item
 }
 
 func GenerateCards(c *gin.Context) {
@@ -344,4 +355,56 @@ func ListCardLogs(c *gin.Context) {
 	}
 	
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": logsWithInfo})
+}
+
+// calculateCardStats 计算单个卡密的统计数据
+func calculateCardStats(cardID uint) (avgUsage int, suspendedCount int) {
+	// 查询该卡密关联的所有账号ID
+	var cardAccounts []model.CardAccount
+	if err := database.DB.Where("card_id = ?", cardID).Find(&cardAccounts).Error; err != nil {
+		return 0, 0
+	}
+
+	if len(cardAccounts) == 0 {
+		return 0, 0
+	}
+
+	// 收集所有账号ID（去重）
+	accountIDSet := make(map[uint]bool)
+	for _, ca := range cardAccounts {
+		accountIDSet[ca.AccountID] = true
+	}
+
+	accountIDs := make([]uint, 0, len(accountIDSet))
+	for id := range accountIDSet {
+		accountIDs = append(accountIDs, id)
+	}
+
+	// 查询这些账号的详细信息
+	var accounts []model.Account
+	if err := database.DB.Where("id IN ?", accountIDs).Find(&accounts).Error; err != nil {
+		return 0, 0
+	}
+
+	// 统计
+	var totalUsage float64
+	var totalLimit float64
+	suspendedCount = 0
+
+	for _, acc := range accounts {
+		if acc.Status == model.AccountStatusSuspended {
+			suspendedCount++
+		}
+		if acc.CreditLimit > 0 {
+			totalUsage += acc.CreditUsed
+			totalLimit += acc.CreditLimit
+		}
+	}
+
+	// 计算平均用量百分比
+	if totalLimit > 0 {
+		avgUsage = int((totalUsage / totalLimit) * 100)
+	}
+
+	return avgUsage, suspendedCount
 }
