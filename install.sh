@@ -149,9 +149,12 @@ get_install_config() {
     echo ""
     
     if [ "$SILENT_INSTALL" != "true" ]; then
-        read -p "确认安装？[y/N] " -n 1 -r
+        read -p "确认安装？[Y/n] " -n 1 -r
         echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        # 如果用户输入为空或 Y/y，则继续安装
+        if [[ -z $REPLY ]] || [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "确认安装"
+        else
             print_warn "安装已取消"
             exit 0
         fi
