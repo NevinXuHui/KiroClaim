@@ -76,7 +76,10 @@ function switchTab(name, el) {
     loadAccountEmailDomainFilter();
   }
   if (name === 'assigned') loadAssignedAccounts(1);
-  if (name === 'cards') loadCards(1);
+  if (name === 'cards') {
+    restoreCardFilters();
+    loadCards(1);
+  }
   if (name === 'logs') loadLogs(1);
   if (name === 'settings') loadSettings();
 
@@ -116,7 +119,10 @@ function initApp() {
       loadAccountEmailDomainFilter();
     }
     if (savedTab === 'assigned') loadAssignedAccounts(1);
-    if (savedTab === 'cards') loadCards(1);
+    if (savedTab === 'cards') {
+      restoreCardFilters();
+      loadCards(1);
+    }
     if (savedTab === 'logs') loadLogs(1);
     if (savedTab === 'settings') loadSettings();
 

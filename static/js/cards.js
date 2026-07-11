@@ -1,17 +1,156 @@
 // 卡密管理模块
 
-let cardStatusFilter = '';
-let cardKeyword = '';
-let cardAccountCountFilter = ''; // 账号数量筛选
+// 从 localStorage 恢复筛选条件
+let cardStatusFilter = localStorage.getItem('cardStatusFilter') || '';
+let cardKeyword = localStorage.getItem('cardKeyword') || '';
+let cardAccountCountFilter = localStorage.getItem('cardAccountCountFilter') || '';
 let genSubscription = '';
 let genEmailDomains = []; // 存储选中的邮箱域名
-let cardSortBy = 'id'; // 排序字段
-let cardSortOrder = 'desc'; // 排序方向
+let cardSortBy = localStorage.getItem('cardSortBy') || 'id';
+let cardSortOrder = localStorage.getItem('cardSortOrder') || 'desc';
 
 // 每页显示数量（从 localStorage 读取，默认 15）
 let cardPageSize = parseInt(localStorage.getItem('cardPageSize') || '15');
 
 let selectedCardIds = new Set();
+
+// 恢复保存的筛选条件到 UI
+function restoreCardFilters() {
+  console.log('🔄 开始恢复筛选条件...');
+  console.log('当前 localStorage 数据:', {
+    cardStatusFilter: localStorage.getItem('cardStatusFilter'),
+    cardKeyword: localStorage.getItem('cardKeyword'),
+    cardAccountCountFilter: localStorage.getItem('cardAccountCountFilter'),
+    cardSortBy: localStorage.getItem('cardSortBy'),
+    cardSortOrder: localStorage.getItem('cardSortOrder')
+  });
+  console.log('当前变量值:', {
+    cardStatusFilter: cardStatusFilter,
+    cardKeyword: cardKeyword,
+    cardAccountCountFilter: cardAccountCountFilter,
+    cardSortBy: cardSortBy,
+    cardSortOrder: cardSortOrder
+  });
+
+  // 恢复关键词搜索
+  const keywordInput = document.getElementById('cardKeyword');
+  if (keywordInput && cardKeyword) {
+    keywordInput.value = cardKeyword;
+    console.log('✓ 恢复关键词:', cardKeyword);
+  }
+
+  // 恢复日期筛选
+  const createdFrom = localStorage.getItem('cardCreatedFrom');
+  const createdTo = localStorage.getItem('cardCreatedTo');
+  const cfInput = document.getElementById('cardCreatedFrom');
+  const ctInput = document.getElementById('cardCreatedTo');
+  if (cfInput && createdFrom) {
+    cfInput.value = createdFrom;
+    console.log('✓ 恢复开始日期:', createdFrom);
+  }
+  if (ctInput && createdTo) {
+    ctInput.value = createdTo;
+    console.log('✓ 恢复结束日期:', createdTo);
+  }
+
+  // 恢复状态筛选按钮文本和选中状态
+  const filterTextMap = {
+    '': '全部状态',
+    'unused': '未使用',
+    'active': '使用中'
+  };
+  const filterText = filterTextMap[cardStatusFilter] || '全部状态';
+  const filterTextEl = document.getElementById('cardFilterText');
+  if (filterTextEl) {
+    filterTextEl.textContent = filterText;
+    console.log('✓ 恢复状态筛选:', cardStatusFilter, '显示:', filterText);
+  }
+
+  // 更新下拉菜单选中状态
+  document.querySelectorAll('#cardFilterDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+    const onclick = item.getAttribute('onclick');
+    if (onclick && onclick.includes("'" + cardStatusFilter + "'")) {
+      item.classList.add('selected');
+      console.log('✓ 标记状态菜单项为选中:', item.textContent);
+    }
+  });
+
+  // 恢复账号数量筛选按钮文本和选中状态
+  const accountCountTextMap = {
+    '': '全部数量',
+    '1': '单账号',
+    '2': '2个账号',
+    '3': '3个账号',
+    '4': '4个账号',
+    '5': '5个账号',
+    '10': '10个账号'
+  };
+  const countText = accountCountTextMap[cardAccountCountFilter] || '全部数量';
+  const countTextEl = document.getElementById('cardAccountCountText');
+  if (countTextEl) {
+    countTextEl.textContent = countText;
+    console.log('✓ 恢复账号数量筛选:', cardAccountCountFilter, '显示:', countText);
+  }
+
+  // 更新下拉菜单选中状态
+  document.querySelectorAll('#cardAccountCountDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+    const onclick = item.getAttribute('onclick');
+    if (onclick && onclick.includes("'" + cardAccountCountFilter + "'")) {
+      item.classList.add('selected');
+      console.log('✓ 标记账号数量菜单项为选中:', item.textContent);
+    }
+  });
+
+  // 恢复排序选择按钮文本和选中状态
+  const sortTextMap = {
+    'id-desc': 'ID 降序',
+    'id-asc': 'ID 升序',
+    'created_at-desc': '创建时间 (新→旧)',
+    'created_at-asc': '创建时间 (旧→新)',
+    'used_at-desc': '兑换时间 (新→旧)',
+    'used_at-asc': '兑换时间 (旧→新)'
+  };
+  const sortKey = cardSortBy + '-' + cardSortOrder;
+  const sortText = sortTextMap[sortKey] || 'ID 降序';
+  const sortTextEl = document.getElementById('cardSortText');
+  if (sortTextEl) {
+    sortTextEl.textContent = sortText;
+    console.log('✓ 恢复排序方式:', sortKey, '显示:', sortText);
+  }
+
+  // 更新排序下拉菜单选中状态
+  document.querySelectorAll('#cardSortDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+    const onclick = item.getAttribute('onclick');
+    if (onclick && onclick.includes("'" + cardSortBy + "'") && onclick.includes("'" + cardSortOrder + "'")) {
+      item.classList.add('selected');
+      console.log('✓ 标记排序菜单项为选中:', item.textContent);
+    }
+  });
+
+  // 恢复每页显示数量按钮文本和选中状态
+  const pageSizeText = cardPageSize + ' 条/页';
+  const pageSizeTextEl = document.getElementById('cardPageSizeText');
+  if (pageSizeTextEl) {
+    pageSizeTextEl.textContent = pageSizeText;
+    console.log('✓ 恢复每页显示:', cardPageSize);
+  }
+
+  // 更新每页显示数量下拉菜单选中状态
+  document.querySelectorAll('#cardPageSizeDropdown .k-dropdown-item').forEach(function(item) {
+    item.classList.remove('selected');
+    const onclick = item.getAttribute('onclick');
+    if (onclick && onclick.includes('selectCardPageSize(' + cardPageSize)) {
+      item.classList.add('selected');
+      console.log('✓ 标记每页显示菜单项为选中:', item.textContent);
+    }
+  });
+
+  console.log('✅ 筛选条件恢复完成');
+}
+
 
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) {
@@ -99,6 +238,12 @@ async function loadCards(page = 1) {
   cardKeyword = (document.getElementById('cardKeyword')?.value || '').trim();
   const createdFrom = document.getElementById('cardCreatedFrom')?.value || '';
   const createdTo = document.getElementById('cardCreatedTo')?.value || '';
+
+  // 保存筛选条件到 localStorage
+  localStorage.setItem('cardKeyword', cardKeyword);
+  localStorage.setItem('cardCreatedFrom', createdFrom);
+  localStorage.setItem('cardCreatedTo', createdTo);
+
   let url = `/admin/cards?page=${page}&size=${cardPageSize}`;
   if (cardStatusFilter) url += `&status=${cardStatusFilter}`;
   if (cardKeyword) url += `&keyword=${encodeURIComponent(cardKeyword)}`;
@@ -123,16 +268,39 @@ async function loadCards(page = 1) {
     const subscription = cardSubscriptionLabel(c.Subscription || '');
     const status = c.Status || (c.UsedAt ? 'active' : 'unused');
     const emailDomainLabel = c.AllowedEmailDomains ? `<span class="k-badge" style="background:#fef3c7;color:#92400e;font-size:11px" title="限制邮箱域名: ${escapeAttr(c.AllowedEmailDomains)}">🔒${escapeHtml(c.AllowedEmailDomains.split(',')[0])}${c.AllowedEmailDomains.split(',').length > 1 ? '...' : ''}</span>` : '';
+
+    // 使用中的卡密显示统计信息
+    let statsLabel = '';
+
+    // 调试日志
+    console.log('卡密 ID:', c.ID, 'Status:', status, 'AvgUsage:', c.AvgUsage, 'SuspendedCount:', c.SuspendedCount);
+
+    if (status === 'active' && (c.AvgUsage !== undefined || c.SuspendedCount !== undefined)) {
+      const avgUsage = c.AvgUsage || 0;
+      const suspendedCount = c.SuspendedCount || 0;
+      const usageColor = avgUsage >= 80 ? '#dc2626' : avgUsage >= 60 ? '#f59e0b' : '#10b981';
+      statsLabel = `<div style="font-size:11px;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+        <span style="color:${usageColor}">用量 ${avgUsage}%</span>
+        ${suspendedCount > 0 ? `<span style="color:#dc2626">封号 ${suspendedCount}</span>` : '<span style="color:#10b981">无封号</span>'}
+      </div>`;
+      console.log('✓ 生成统计标签:', '用量', avgUsage + '%', '封号', suspendedCount);
+    } else {
+      console.log('✗ 不显示统计 - status:', status, 'AvgUsage defined:', c.AvgUsage !== undefined, 'SuspendedCount defined:', c.SuspendedCount !== undefined);
+    }
+
     const usedAtDisplay = formatCardTime(c.UsedAt);
     return `<tr>
       <td data-label="选择"><input type="checkbox" class="k-checkbox" ${checked} onchange="toggleCardSelect(${c.ID}, this.checked)"></td>
       <td data-label="ID">${c.ID}</td>
       <td data-label="序列号">
-        <code class="copyable-text" style="background:#f1f1f1;padding:2px 4px;white-space:nowrap" 
-              onclick="showCardLogs(${c.ID}, '${escapeAttr(c.Code)}')" 
+        <code class="copyable-text" style="background:#f1f1f1;padding:2px 4px;white-space:nowrap"
+              onclick="showCardLogs(${c.ID}, '${escapeAttr(c.Code)}')"
               title="点击查看详情">${escapeHtml(c.Code)}</code>
       </td>
-      <td data-label="账号订阅" style="font-size:12px;white-space:nowrap">${escapeHtml(subscription)} ${multiLabel} ${emailDomainLabel}</td>
+      <td data-label="账号订阅" style="font-size:12px;white-space:nowrap">
+        <div>${escapeHtml(subscription)} ${multiLabel} ${emailDomainLabel}</div>
+        ${statsLabel}
+      </td>
       <td data-label="状态">${cardStatusBadge(status)}</td>
       <td data-label="兑换时间" style="font-size:12px;color:var(--text-muted)">${usedAtDisplay}</td>
       <td data-label="操作">
@@ -157,6 +325,8 @@ async function loadCards(page = 1) {
 
 function selectCardFilter(value, text) {
   cardStatusFilter = value;
+  localStorage.setItem('cardStatusFilter', value);
+  console.log('💾 保存状态筛选:', value);
   document.getElementById('cardFilterText').textContent = text;
   document.querySelectorAll('#cardFilterDropdown .k-dropdown-item').forEach(function(item) {
     item.classList.remove('selected');
@@ -168,6 +338,7 @@ function selectCardFilter(value, text) {
 
 function selectCardAccountCount(value, text) {
   cardAccountCountFilter = value;
+  localStorage.setItem('cardAccountCountFilter', value);
   document.getElementById('cardAccountCountText').textContent = text;
   document.querySelectorAll('#cardAccountCountDropdown .k-dropdown-item').forEach(function(item) {
     item.classList.remove('selected');
@@ -194,6 +365,8 @@ function selectCardPageSize(size, text) {
 function selectCardSort(sortBy, order, text) {
   cardSortBy = sortBy;
   cardSortOrder = order;
+  localStorage.setItem('cardSortBy', sortBy);
+  localStorage.setItem('cardSortOrder', order);
   document.getElementById('cardSortText').textContent = text;
   document.querySelectorAll('#cardSortDropdown .k-dropdown-item').forEach(function(item) {
     item.classList.remove('selected');
@@ -445,6 +618,13 @@ function resetCardFilters() {
   cardKeyword = '';
   cardAccountCountFilter = '';
 
+  // 清除 localStorage 中的筛选条件
+  localStorage.removeItem('cardStatusFilter');
+  localStorage.removeItem('cardKeyword');
+  localStorage.removeItem('cardAccountCountFilter');
+  localStorage.removeItem('cardCreatedFrom');
+  localStorage.removeItem('cardCreatedTo');
+
   var keywordInput = document.getElementById('cardKeyword');
   if (keywordInput) keywordInput.value = '';
   var cf = document.getElementById('cardCreatedFrom');
@@ -457,13 +637,13 @@ function resetCardFilters() {
     item.classList.remove('selected');
   });
   document.querySelector('#cardFilterDropdown .k-dropdown-item:first-child')?.classList.add('selected');
-  
+
   document.getElementById('cardAccountCountText').textContent = '全部数量';
   document.querySelectorAll('#cardAccountCountDropdown .k-dropdown-item').forEach(function(item) {
     item.classList.remove('selected');
   });
   document.querySelector('#cardAccountCountDropdown .k-dropdown-item:first-child')?.classList.add('selected');
-  
+
   loadCards(1);
 }
 
