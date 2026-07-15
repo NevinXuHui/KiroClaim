@@ -184,31 +184,27 @@ func filterAccountSubscriptionQuery(q *gorm.DB, subscription string) *gorm.DB {
 }
 
 func filterAccountEmailDomainsQuery(q *gorm.DB, allowedEmailDomains string) *gorm.DB {
-	if allowedEmailDomains == "" {
-		return q
-	}
-	domains := strings.Split(allowedEmailDomains, ",")
+	deny, domains := parseEmailDomainRestriction(allowedEmailDomains)
 	if len(domains) == 0 {
 		return q
 	}
-	
-	// 构建 SQL 条件：email LIKE '%@domain1' OR email LIKE '%@domain2' OR ...
+
+	// 允许: email LIKE '%@d1' OR ...
+	// 排除: NOT (email LIKE '%@d1' OR ...)
 	orConditions := make([]string, 0, len(domains))
 	args := make([]interface{}, 0, len(domains))
 	for _, domain := range domains {
-		domain = strings.TrimSpace(domain)
-		if domain == "" {
-			continue
-		}
 		orConditions = append(orConditions, "LOWER(email) LIKE ?")
 		args = append(args, "%@"+strings.ToLower(domain))
 	}
-	
 	if len(orConditions) == 0 {
 		return q
 	}
-	
-	return q.Where(strings.Join(orConditions, " OR "), args...)
+	clause := strings.Join(orConditions, " OR ")
+	if deny {
+		return q.Where("NOT ("+clause+")", args...)
+	}
+	return q.Where(clause, args...)
 }
 
 func popAccount(excludeID uint, subscription string, allowedEmailDomains string) (*model.Account, error) {
@@ -392,47 +388,92 @@ func popMultipleAccounts(n int, subscription string, allowedEmailDomains string)
 		accounts = append(accounts, &acc)
 	}
 
+	if len(accounts) >= n {
+		return accounts[:n], nil
+	}
+
+	unchecked := make([]model.Account, 0, len(candidates))
 	for i := range candidates {
-		if len(accounts) >= n {
-			break
-		}
 		candidate := candidates[i]
 		if candidate.LastCheckedAt != nil && candidate.LastCheckedAt.After(freshCutoff) {
 			continue
 		}
-		result := checkAccountHealth(candidate)
-		updates := buildHealthUpdates(result, time.Now())
-		if err := persistHealthUpdates(candidate.ID, updates); err != nil {
+		// 跳过已作为 fresh 命中的账号
+		already := false
+		for _, a := range accounts {
+			if a.ID == candidate.ID {
+				already = true
+				break
+			}
+		}
+		if already {
 			continue
 		}
-		if result.errMsg != "" {
-			continue
-		}
+		unchecked = append(unchecked, candidate)
+	}
 
-		candidate.AccessToken = result.newToken
-		candidate.RefreshToken = result.newRefresh
-		candidate.Email = result.email
-		candidate.Subscription = result.subscription
-		candidate.CreditUsed = result.creditUsed
-		candidate.CreditLimit = result.creditLimit
-		if result.provider != "" {
-			candidate.Provider = result.provider
+	if len(unchecked) > 0 {
+		localLimit := currentUpstreamCheckConcurrency()
+		if localLimit <= 0 {
+			localLimit = 6
 		}
-		candidate.Status = result.status
-		if !isDispatchable(&candidate, subscription, allowedEmailDomains) {
-			continue
+		sem := make(chan struct{}, localLimit)
+		var mu sync.Mutex
+		var found atomic.Int32
+		var wg sync.WaitGroup
+		found.Store(int32(len(accounts)))
+
+		for i := range unchecked {
+			if int(found.Load()) >= n {
+				break
+			}
+			sem <- struct{}{}
+			wg.Add(1)
+			go func(candidate model.Account) {
+				defer func() { <-sem; wg.Done() }()
+				if int(found.Load()) >= n {
+					return
+				}
+				result := checkAccountHealth(candidate)
+				updates := buildHealthUpdates(result, time.Now())
+				if err := persistHealthUpdates(candidate.ID, updates); err != nil {
+					return
+				}
+				if result.errMsg != "" {
+					return
+				}
+				candidate.AccessToken = result.newToken
+				candidate.RefreshToken = result.newRefresh
+				candidate.Email = result.email
+				candidate.Subscription = result.subscription
+				candidate.CreditUsed = result.creditUsed
+				candidate.CreditLimit = result.creditLimit
+				if result.provider != "" {
+					candidate.Provider = result.provider
+				}
+				candidate.Status = result.status
+				if !isDispatchable(&candidate, subscription, allowedEmailDomains) {
+					return
+				}
+				if !verifyDispatchable(candidate.AccessToken) {
+					return
+				}
+				mu.Lock()
+				if len(accounts) < n {
+					acc := candidate
+					accounts = append(accounts, &acc)
+					found.Store(int32(len(accounts)))
+				}
+				mu.Unlock()
+			}(unchecked[i])
 		}
-		if !verifyDispatchable(candidate.AccessToken) {
-			continue
-		}
-		acc := candidate
-		accounts = append(accounts, &acc)
+		wg.Wait()
 	}
 
 	if len(accounts) < n {
 		return nil, gorm.ErrRecordNotFound
 	}
-	return accounts, nil
+	return accounts[:n], nil
 }
 
 func buildAccountResp(a *model.Account) gin.H {
@@ -611,44 +652,132 @@ func streamFreshTokenCode(c *gin.Context, item tokenStreamCard, index *int) bool
 	return ok
 }
 
+func releaseReservedAccount(accountID uint) {
+	database.DB.Model(&model.Account{}).Where("id = ?", accountID).
+		Updates(map[string]interface{}{"used": false, "used_at": nil})
+}
+
+// streamFillTokenAccounts 并发取号：多号卡时并行 pop/预占，就绪即推流。
 func streamFillTokenAccounts(c *gin.Context, item tokenStreamCard, needed int, index *int) (bool, int) {
 	if needed <= 0 {
 		return true, 0
 	}
 	clientIP := c.ClientIP()
 	now := time.Now()
+	ctx := c.Request.Context()
+
+	workers := needed
+	if lim := currentUpstreamCheckConcurrency(); lim > 0 && workers > lim {
+		workers = lim
+	}
+	if workers < 1 {
+		workers = 1
+	}
+
+	results := make(chan *model.Account, needed)
+	var stop atomic.Bool
+	var remaining atomic.Int32
+	remaining.Store(int32(needed))
+	var wg sync.WaitGroup
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				if stop.Load() || ctx.Err() != nil {
+					return
+				}
+				if remaining.Load() <= 0 {
+					return
+				}
+
+				account, err := popAccount(0, item.card.Subscription, item.card.AllowedEmailDomains)
+				if err != nil {
+					return
+				}
+				if stop.Load() || ctx.Err() != nil {
+					return
+				}
+
+				// 原子领取一个待填名额，避免超发
+				claimed := false
+				for {
+					left := remaining.Load()
+					if left <= 0 {
+						break
+					}
+					if remaining.CompareAndSwap(left, left-1) {
+						claimed = true
+						break
+					}
+				}
+				if !claimed {
+					return
+				}
+
+				reserved := database.DB.Model(&model.Account{}).
+					Where("id = ? AND used = ?", account.ID, false).
+					Updates(map[string]interface{}{"used": true, "used_at": now})
+				if reserved.Error != nil || reserved.RowsAffected == 0 {
+					remaining.Add(1)
+					continue
+				}
+
+				select {
+				case results <- account:
+				case <-ctx.Done():
+					releaseReservedAccount(account.ID)
+					remaining.Add(1)
+					return
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
 	sent := 0
 	accountIDStrs := make([]string, 0, needed)
-	for sent < needed {
-		account, err := popAccount(0, item.card.Subscription, item.card.AllowedEmailDomains)
-		if err != nil {
-			streamTokenEvent(c, "fail", gin.H{
-				"status":  http.StatusServiceUnavailable,
-				"message": "账号池账号不足: " + item.code,
-				"reason":  "account_pool_shortage",
-				"partial": sent,
-			})
-			return false, sent
-		}
-
-		reserved := database.DB.Model(&model.Account{}).
-			Where("id = ? AND used = ?", account.ID, false).
-			Updates(map[string]interface{}{"used": true, "used_at": now})
-		if reserved.Error != nil || reserved.RowsAffected == 0 {
-			continue
-		}
+	for account := range results {
 		if err := database.DB.Create(&model.CardAccount{CardID: item.card.ID, AccountID: account.ID}).Error; err != nil {
-			database.DB.Model(account).Updates(map[string]interface{}{"used": false, "used_at": nil})
+			releaseReservedAccount(account.ID)
+			remaining.Add(1)
 			continue
 		}
 
 		accountIDStrs = append(accountIDStrs, strconv.Itoa(int(account.ID)))
 		database.DB.Create(&model.CardLog{CardID: item.card.ID, Code: item.card.Code, Action: "activate", AccountID: account.ID, Email: account.Email, ClientIP: clientIP})
 		if !streamAccountToken(c, *index, item.code, account) {
+			stop.Store(true)
+			// channel 内尚未绑定/推流的预占账号全部回滚
+			for extra := range results {
+				releaseReservedAccount(extra.ID)
+			}
 			return false, sent
 		}
 		*index = *index + 1
 		sent++
+		if sent >= needed {
+			stop.Store(true)
+			for extra := range results {
+				releaseReservedAccount(extra.ID)
+			}
+			break
+		}
+	}
+
+	if sent < needed {
+		streamTokenEvent(c, "fail", gin.H{
+			"status":  http.StatusServiceUnavailable,
+			"message": "账号池账号不足: " + item.code,
+			"reason":  "account_pool_shortage",
+			"partial": sent,
+		})
+		return false, sent
 	}
 
 	if needed > 1 {

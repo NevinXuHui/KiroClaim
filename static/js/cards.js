@@ -6,6 +6,8 @@ let cardKeyword = localStorage.getItem('cardKeyword') || '';
 let cardAccountCountFilter = localStorage.getItem('cardAccountCountFilter') || '';
 let genSubscription = '';
 let genEmailDomains = []; // 存储选中的邮箱域名
+let genEmailDomainOptions = []; // 可选域名全集
+let genEmailDomainMode = 'allow'; // allow=仅允许 / deny=排除
 let cardSortBy = localStorage.getItem('cardSortBy') || 'id';
 let cardSortOrder = localStorage.getItem('cardSortOrder') || 'desc';
 
@@ -267,7 +269,15 @@ async function loadCards(page = 1) {
     const multiLabel = c.AccountCount > 1 ? `<span class="k-badge" style="background:#eff6ff;color:#1d4ed8">${c.AccountCount}号</span>` : '';
     const subscription = cardSubscriptionLabel(c.Subscription || '');
     const status = c.Status || (c.UsedAt ? 'active' : 'unused');
-    const emailDomainLabel = c.AllowedEmailDomains ? `<span class="k-badge" style="background:#fef3c7;color:#92400e;font-size:11px" title="限制邮箱域名: ${escapeAttr(c.AllowedEmailDomains)}">🔒${escapeHtml(c.AllowedEmailDomains.split(',')[0])}${c.AllowedEmailDomains.split(',').length > 1 ? '...' : ''}</span>` : '';
+    let emailDomainLabel = '';
+    if (c.AllowedEmailDomains) {
+      const rawDomains = String(c.AllowedEmailDomains).split(',').map(s => s.trim()).filter(Boolean);
+      const isDeny = rawDomains.length > 0 && rawDomains.every(d => d.startsWith('!'));
+      const shown = rawDomains.map(d => d.startsWith('!') ? d.slice(1) : d);
+      const title = (isDeny ? '排除邮箱域名: ' : '限制邮箱域名: ') + shown.join(', ');
+      const head = (isDeny ? '⛔' : '🔒') + (shown[0] || '');
+      emailDomainLabel = `<span class="k-badge" style="background:${isDeny ? '#fee2e2' : '#fef3c7'};color:${isDeny ? '#991b1b' : '#92400e'};font-size:11px" title="${escapeAttr(title)}">${escapeHtml(head)}${shown.length > 1 ? '...' : ''}</span>`;
+    }
 
     // 使用中的卡密显示统计信息
     let statsLabel = '';
@@ -403,7 +413,12 @@ function updateModeHint() {
   if (!hint) return;
   const accountText = `每张绑定 ${accountCount} 个账号`;
   const subscriptionText = genSubscription ? cardSubscriptionLabel(genSubscription) : '请先选择账号订阅';
-  const domainText = genEmailDomains.length > 0 ? `，限制域名：${genEmailDomains.join(', ')}` : '';
+  let domainText = '';
+  if (genEmailDomains.length > 0) {
+    domainText = genEmailDomainMode === 'deny'
+      ? `，排除域名：${genEmailDomains.join(', ')}`
+      : `，仅允许域名：${genEmailDomains.join(', ')}`;
+  }
   hint.textContent = `将生成 ${count} 张卡密，${accountText}，账号订阅：${subscriptionText}${domainText}。`;
 }
 
@@ -423,6 +438,7 @@ async function loadEmailDomains() {
 
   if (r.code !== 0 || !Array.isArray(r.data)) {
     genEmailDomains = [];
+    genEmailDomainOptions = [];
     updateEmailDomainsDisplay();
     menu.innerHTML = '<div class="k-dropdown-item disabled">域名加载失败</div>';
     return;
@@ -438,6 +454,8 @@ async function loadEmailDomains() {
     return !!it.domain;
   });
 
+  genEmailDomainOptions = domains.map(function(it) { return it.domain; });
+
   if (!domains.length) {
     genEmailDomains = [];
     updateEmailDomainsDisplay();
@@ -445,26 +463,47 @@ async function loadEmailDomains() {
     return;
   }
 
-  // 添加"不限制"选项
-  let html = '<div class="k-dropdown-item" data-domain="" onclick="toggleEmailDomain(\'\')">不限制</div>';
+  genEmailDomains = genEmailDomains.filter(function(d) {
+    return genEmailDomainOptions.indexOf(d) !== -1;
+  });
+
+  renderEmailDomainsMenu(domains);
+  updateEmailDomainsDisplay();
+}
+
+function emailDomainToolbarHTML() {
+  return '<div style="padding:6px 10px;display:flex;gap:6px;flex-wrap:wrap" data-email-domain-toolbar="1">' +
+    '<button type="button" class="ui-btn ui-btn-sm ' + (genEmailDomainMode === 'allow' ? 'ui-btn-primary' : 'ui-btn-secondary') + '" onclick="event.stopPropagation();setEmailDomainMode(\'allow\')">仅允许</button>' +
+    '<button type="button" class="ui-btn ui-btn-sm ' + (genEmailDomainMode === 'deny' ? 'ui-btn-primary' : 'ui-btn-secondary') + '" onclick="event.stopPropagation();setEmailDomainMode(\'deny\')">排除</button>' +
+    '<button type="button" class="ui-btn ui-btn-sm ui-btn-secondary" onclick="event.stopPropagation();invertEmailDomains()">反选</button>' +
+    '<button type="button" class="ui-btn ui-btn-sm ui-btn-secondary" onclick="event.stopPropagation();selectAllEmailDomains()">全选</button>' +
+    '</div>';
+}
+
+function renderEmailDomainsMenu(domains) {
+  const menu = document.getElementById('genEmailDomainsMenu');
+  if (!menu) return;
+
+  let html = emailDomainToolbarHTML();
   html += '<div style="border-top:1px solid #eee;margin:4px 0"></div>';
-  
+  html += '<div class="k-dropdown-item" data-domain="" onclick="toggleEmailDomain(\'\')">不限制</div>';
+  html += '<div style="border-top:1px solid #eee;margin:4px 0"></div>';
+
   html += domains.map(function(it) {
     const countColor = it.unusedCount > 0 ? '#999' : '#dc2626';
     const checked = genEmailDomains.includes(it.domain) ? '✓ ' : '';
-    return '<div class="k-dropdown-item" data-domain="' + escapeAttr(it.domain) + '" onclick="toggleEmailDomain(\'' + escapeAttr(it.domain) + '\')">' +
-      '<span id="domain-check-' + escapeAttr(it.domain) + '">' + checked + '</span>' +
+    const safeDomain = escapeAttr(it.domain);
+    return '<div class="k-dropdown-item" data-domain="' + safeDomain + '" onclick="toggleEmailDomain(\'' + safeDomain + '\')">' +
+      '<span id="domain-check-' + safeDomain + '">' + checked + '</span>' +
       escapeHtml(it.domain) + ' <span style="color:' + countColor + ';font-size:12px">(' + it.unusedCount + ' 可用)</span>' +
       '</div>';
   }).join('');
 
   menu.innerHTML = html;
-  updateEmailDomainsDisplay();
 }
 
 function toggleEmailDomain(domain) {
   if (domain === '') {
-    // 选择"不限制"，清空所有选择
     genEmailDomains = [];
   } else {
     const index = genEmailDomains.indexOf(domain);
@@ -477,26 +516,66 @@ function toggleEmailDomain(domain) {
   updateEmailDomainsDisplay();
   updateEmailDomainsChecks();
   updateModeHint();
-  // 不关闭下拉框，允许多选
+}
+
+function setEmailDomainMode(mode) {
+  genEmailDomainMode = mode === 'deny' ? 'deny' : 'allow';
+  const menu = document.getElementById('genEmailDomainsMenu');
+  const toolbar = menu && menu.querySelector('[data-email-domain-toolbar="1"]');
+  if (toolbar) {
+    toolbar.outerHTML = emailDomainToolbarHTML();
+  }
+  updateEmailDomainsDisplay();
+  updateModeHint();
+}
+
+function invertEmailDomains() {
+  if (!genEmailDomainOptions.length) return;
+  const selected = new Set(genEmailDomains);
+  genEmailDomains = genEmailDomainOptions.filter(function(d) {
+    return !selected.has(d);
+  });
+  updateEmailDomainsDisplay();
+  updateEmailDomainsChecks();
+  updateModeHint();
+}
+
+function selectAllEmailDomains() {
+  if (!genEmailDomainOptions.length) return;
+  genEmailDomains = genEmailDomainOptions.slice();
+  updateEmailDomainsDisplay();
+  updateEmailDomainsChecks();
+  updateModeHint();
+}
+
+function encodeEmailDomainRestriction() {
+  if (!genEmailDomains.length) return '';
+  if (genEmailDomainMode === 'deny') {
+    return genEmailDomains.map(function(d) { return '!' + d; }).join(',');
+  }
+  return genEmailDomains.join(',');
 }
 
 function updateEmailDomainsDisplay() {
-  const text = document.getElementById('genEmailDomainsText');
-  if (!text) return;
-  
+  const textEl = document.getElementById('genEmailDomainsText');
+  if (!textEl) return;
+
   if (genEmailDomains.length === 0) {
-    text.textContent = '不限制';
-  } else if (genEmailDomains.length === 1) {
-    text.textContent = genEmailDomains[0];
+    textEl.textContent = '不限制';
+    return;
+  }
+  const prefix = genEmailDomainMode === 'deny' ? '排除 ' : '';
+  if (genEmailDomains.length === 1) {
+    textEl.textContent = prefix + genEmailDomains[0];
   } else {
-    text.textContent = genEmailDomains[0] + ' +' + (genEmailDomains.length - 1);
+    textEl.textContent = prefix + genEmailDomains[0] + ' +' + (genEmailDomains.length - 1);
   }
 }
 
 function updateEmailDomainsChecks() {
   const menu = document.getElementById('genEmailDomainsMenu');
   if (!menu) return;
-  
+
   menu.querySelectorAll('.k-dropdown-item').forEach(function(item) {
     const domain = item.getAttribute('data-domain');
     const checkSpan = item.querySelector('[id^="domain-check-"]');
@@ -565,13 +644,14 @@ function closeGenerateModal() {
   document.getElementById('generateModal').classList.remove('active');
   document.getElementById('generateResult').innerHTML = '';
   genEmailDomains = []; // 重置邮箱域名选择
+  genEmailDomainMode = 'allow';
   updateEmailDomainsDisplay();
 }
 
 async function doGenerate() {
   const count = parseInt(document.getElementById('genCount').value) || 1;
   const accountCount = getGenAccountCount(true);
-  const allowedEmailDomains = genEmailDomains.join(',');
+  const allowedEmailDomains = encodeEmailDomainRestriction();
   const resultEl = document.getElementById('generateResult');
   if (!genSubscription) {
     const msg = '请先选择账号订阅';
@@ -588,9 +668,12 @@ async function doGenerate() {
   });
   if (r.code === 0) {
     const codes = (r.data?.codes || []).join('\n');
-    resultEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    resultEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
         <span style="font-size:13px;color:var(--text-muted)">生成成功，共 ${r.data?.codes?.length ?? count} 张：</span>
-        <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="copyCardKeys()">一键复制全部</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="ui-btn ui-btn-secondary ui-btn-sm" onclick="copyCardKeys()">一键复制全部</button>
+          <button class="ui-btn ui-btn-primary ui-btn-sm" onclick="window.open('/c', '_blank')">前往兑换页</button>
+        </div>
       </div>
       <textarea class="k-input" id="generatedCodes" rows="8" readonly style="font-family:monospace;font-size:12px">${escapeHtml(codes)}</textarea>`;
     loadCards(1);

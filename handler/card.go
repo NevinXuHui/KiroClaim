@@ -156,7 +156,7 @@ func ListCards(c *gin.Context) {
 	}
 
 	q.Count(&total)
-	
+
 	// 构建排序条件
 	var orderClause string
 	switch sortBy {
@@ -174,7 +174,7 @@ func ListCards(c *gin.Context) {
 	} else {
 		orderClause += " desc"
 	}
-	
+
 	q.Order(orderClause).Offset((page - 1) * size).Limit(size).Find(&cards)
 
 	list := make([]cardListItem, 0, len(cards))
@@ -279,59 +279,86 @@ func splitGroups(s string, size int, sep string) string {
 	return strings.Join(parts, sep)
 }
 
-// normalizeEmailDomains 规范化邮箱域名列表
+// parseEmailDomainRestriction 解析域名限制。
+// 支持：
+//   - 白名单: "gmail.com,outlook.com"
+//   - 黑名单: "!qq.com,!163.com"（任一域名以 ! 开头则整体视为排除模式）
+func parseEmailDomainRestriction(raw string) (deny bool, domains []string) {
+	if strings.TrimSpace(raw) == "" {
+		return false, nil
+	}
+	parts := strings.Split(raw, ",")
+	seen := make(map[string]bool)
+	domains = make([]string, 0, len(parts))
+	denyCount := 0
+	for _, part := range parts {
+		item := strings.ToLower(strings.TrimSpace(part))
+		if item == "" {
+			continue
+		}
+		isDeny := strings.HasPrefix(item, "!")
+		if isDeny {
+			denyCount++
+			item = strings.TrimPrefix(item, "!")
+		}
+		item = strings.TrimPrefix(item, "@")
+		item = strings.TrimSpace(item)
+		if item == "" || seen[item] {
+			continue
+		}
+		seen[item] = true
+		domains = append(domains, item)
+	}
+	// 只要出现排除标记，整组按排除模式处理（兼容历史纯白名单）
+	deny = denyCount > 0
+	return deny, domains
+}
+
+// normalizeEmailDomains 规范化邮箱域名列表（保留 ! 排除前缀）
 func normalizeEmailDomains(domains string) string {
-	if domains == "" {
+	deny, list := parseEmailDomainRestriction(domains)
+	if len(list) == 0 {
 		return ""
 	}
-	// 分割、去除空白、去重
-	parts := strings.Split(domains, ",")
-	seen := make(map[string]bool)
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		domain := strings.TrimSpace(part)
-		domain = strings.ToLower(domain)
-		// 确保域名格式正确
-		if domain != "" && !seen[domain] {
-			// 移除开头的 @ 符号（如果有）
-			domain = strings.TrimPrefix(domain, "@")
-			if domain != "" {
-				seen[domain] = true
-				result = append(result, domain)
-			}
+	result := make([]string, 0, len(list))
+	for _, d := range list {
+		if deny {
+			result = append(result, "!"+d)
+		} else {
+			result = append(result, d)
 		}
 	}
 	return strings.Join(result, ",")
 }
 
-// emailMatchesDomains 检查邮箱是否匹配允许的域名列表
+// emailMatchesDomains 检查邮箱是否满足域名限制（允许/排除）
 func emailMatchesDomains(email string, allowedDomains string) bool {
-	if allowedDomains == "" {
-		return true // 没有限制，所有邮箱都可以
+	deny, domains := parseEmailDomainRestriction(allowedDomains)
+	if len(domains) == 0 {
+		return true // 没有限制
 	}
 	if email == "" {
 		return false
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
-	domains := strings.Split(allowedDomains, ",")
+	matched := false
 	for _, domain := range domains {
-		domain = strings.TrimSpace(domain)
-		if domain == "" {
-			continue
-		}
-		// 检查邮箱是否以 @domain 结尾
 		if strings.HasSuffix(email, "@"+domain) {
-			return true
+			matched = true
+			break
 		}
 	}
-	return false
+	if deny {
+		return !matched // 排除模式：命中则不可用
+	}
+	return matched // 允许模式：必须命中
 }
 
 func ListCardLogs(c *gin.Context) {
 	cardID := c.Param("id")
 	var logs []model.CardLog
 	database.DB.Where("card_id = ?", cardID).Order("id desc").Find(&logs)
-	
+
 	// 为每条日志关联查询账号详细信息
 	type LogWithAccountInfo struct {
 		model.CardLog
@@ -339,7 +366,7 @@ func ListCardLogs(c *gin.Context) {
 		AccountCreditUsed  float64 `json:"AccountCreditUsed,omitempty"`
 		AccountCreditLimit float64 `json:"AccountCreditLimit,omitempty"`
 	}
-	
+
 	logsWithInfo := make([]LogWithAccountInfo, 0, len(logs))
 	for _, log := range logs {
 		lwi := LogWithAccountInfo{CardLog: log}
@@ -353,7 +380,7 @@ func ListCardLogs(c *gin.Context) {
 		}
 		logsWithInfo = append(logsWithInfo, lwi)
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": logsWithInfo})
 }
 

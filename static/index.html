@@ -672,12 +672,13 @@
           </div>
         </div>
         <div style="padding:10px 12px; background:#f0f9ff; border-left:3px solid #3b82f6; border-radius:4px; font-size:12px; color:#1e40af; margin-bottom:16px">
-          <strong>提示：</strong>邮箱域名限制用于指定只能分配特定邮箱后缀的账号。可多选，留空则不限制。
+          <strong>提示：</strong>邮箱域名限制支持「仅允许」或「排除」模式，可多选/反选/全选；留空则不限制。
         </div>
         <div id="genModeHint" style="padding:12px; background:#fafafa; border-radius:4px; font-size:13px; color:var(--text-muted); margin-bottom:24px"></div>
 
-        <div style="display:flex; gap:12px">
+        <div style="display:flex; gap:12px; flex-wrap:wrap">
           <button class="ui-btn ui-btn-primary" onclick="doGenerate()">立即生成</button>
+          <button class="ui-btn ui-btn-secondary" onclick="window.open('/c', '_blank')">前往兑换页</button>
           <button class="ui-btn ui-btn-secondary" onclick="closeGenerateModal()">取消</button>
         </div>
 
@@ -692,7 +693,7 @@
   <script src="/static/js/api.js?v=1783433399"></script>
   <script src="/static/js/dashboard.js?v=1783433399"></script>
   <script src="/static/js/accounts.js?v=1783437764"></script>
-  <script src="/static/js/cards.js?v=1783755997"></script>
+  <script src="/static/js/cards.js?v=1784095049"></script>
   <script src="/static/js/export.js?v=1783433399"></script>
   <script src="/static/js/logs.js?v=1783436439"></script>
   <script src="/static/js/settings.js?v=1783465723"></script>
