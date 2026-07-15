@@ -1,0 +1,17 @@
+# 用于本地编译后的 Docker 打包
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata docker-cli docker-cli-compose \
+    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo "Asia/Shanghai" > /etc/timezone
+
+WORKDIR /app
+
+# 复制本地编译好的二进制文件
+COPY kiroclaim-binary ./kiroclaim
+COPY static/ ./static/
+
+EXPOSE 9527
+VOLUME ["/app/data", "/app/logs"]
+
+ENTRYPOINT ["./kiroclaim"]

@@ -16,7 +16,8 @@ logs
 *.zip
 server.out.log
 server.err.log
-kiroclaim
+kiroclaim/
+# kiroclaim-binary  # 本地构建时需要此文件
 kiroclaim.exe
 *.exe
 *.dll
